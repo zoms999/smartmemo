@@ -29,16 +29,16 @@
     --input-border: #dddddd;
     --input-bg: #ffffff;
     --footer-bg: #f9f9f9;
-    
+
     /* 우선순위 색상 */
     --priority-normal: #3498db;
     --priority-high: #f39c12;
     --priority-urgent: #e74c3c;
-    
+
     /* 뱃지 스타일 */
     --badge-bg: #ecf0f1;
     --badge-text: #333333;
-    
+
     /* 크기 관련 변수 */
     --memo-font-size: 14px;
     --header-height: 60px;
@@ -75,12 +75,12 @@
     --input-border: #555555;
     --input-bg: #333333;
     --footer-bg: #2a2a2a;
-    
+
     /* 우선순위 색상 */
     --priority-normal: #3498db;
     --priority-high: #f39c12;
     --priority-urgent: #e74c3c;
-    
+
     /* 뱃지 스타일 */
     --badge-bg: #3d3d3d;
     --badge-text: #f0f0f0;
@@ -112,8 +112,8 @@ body {
 }
 
 /* 선택적 텍스트 */
-.memo-content, 
-textarea, 
+.memo-content,
+textarea,
 input[type="text"] {
     user-select: text;
 }
@@ -396,10 +396,10 @@ input[type="text"] {
 }
 
 /* 뱃지 스타일 */
-.category-badge, 
-.tag-badge, 
-.widget-badge, 
-.priority-badge, 
+.category-badge,
+.tag-badge,
+.widget-badge,
+.priority-badge,
 .reminder-badge {
     display: inline-block;
     padding: 3px 8px;
@@ -931,6 +931,18 @@ input[type="text"] {
 }
 
 .auth-button.logged-in {
+    color: var(--accent-color);
+}
+
+.login-button {
+    color: var(--header-text);
+}
+
+.login-button:hover {
+    background-color: var(--header-button-hover);
+}
+
+.login-button.logged-in {
     color: var(--accent-color);
 }
 
