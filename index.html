@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self'">
+  <title>메모 위젯 앱</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>내 메모</h1>
+    <div class="controls">
+      <input type="text" id="memo-input" placeholder="새 메모 내용 입력...">
+      <button id="add-memo-btn">메모 추가</button>
+    </div>
+    <div id="memos-container">
+      <!-- 메모들이 동적으로 추가됩니다 -->
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html> 

@@ -1,0 +1,76 @@
+{
+  "name": "electron-memo-app",
+  "productName": "MemoWave",
+  "version": "1.0.0",
+  "description": "A professional sticky memo widget app with elegant design and powerful features.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.memowave.app",
+    "productName": "MemoWave",
+    "copyright": "Copyright © 2023",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "darkModeSupport": true
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    }
+  },
+  "keywords": [
+    "Electron",
+    "memo",
+    "notes",
+    "widget",
+    "productivity",
+    "sticky",
+    "reminder"
+  ],
+  "author": {
+    "name": "MemoWave Team",
+    "email": "contact@memowave.example.com"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
+    "dotenv": "^16.5.0",
+    "electron-store": "^8.1.0",
+    "electron-updater": "^6.1.4",
+    "marked": "^10.0.0",
+    "pg": "^8.16.0"
+  }
+}

@@ -1,0 +1,161 @@
+/* style.css */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  background-color: #f4f4f4;
+  color: #333;
+  padding: 20px;
+}
+
+/* 메인 창 스타일 */
+.container {
+  max-width: 500px;
+  margin: 0 auto;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+  margin-top: 0;
+}
+
+.controls {
+  display: flex;
+  margin-bottom: 20px;
+}
+
+#memo-input {
+  flex-grow: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+#add-memo-btn {
+  padding: 10px 15px;
+  background-color: #5cb85c;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  margin-left: 10px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+#add-memo-btn:hover {
+  background-color: #4cae4c;
+}
+
+/* 메인 창의 메모 목록 스타일 */
+.memo-item {
+  background-color: #fff;
+  border: 1px solid #ddd;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.memo-content {
+  flex-grow: 1;
+  outline: none;
+}
+
+.memo-content:focus {
+  background-color: #f8f8f8;
+}
+
+.memo-actions {
+  display: flex;
+  gap: 5px;
+}
+
+.delete-btn, .widget-btn {
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: white;
+}
+
+.delete-btn {
+  background-color: #d9534f;
+}
+
+.delete-btn:hover {
+  background-color: #c9302c;
+}
+
+.widget-btn {
+  background-color: #5bc0de;
+}
+
+.widget-btn:hover {
+  background-color: #46b8da;
+}
+
+/* 위젯 창 스타일 (widget.html에서 사용) */
+.widget {
+  height: 100%;
+  box-sizing: border-box;
+  background-color: #ffffe0;
+  border-radius: 6px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.widget-header {
+  background-color: #f5d742;
+  padding: 8px;
+  cursor: move;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.widget-title {
+  font-weight: bold;
+  font-size: 14px;
+  margin: 0;
+}
+
+.widget-controls button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 5px;
+}
+
+.widget-controls button:hover {
+  color: #333;
+}
+
+.widget-content {
+  flex-grow: 1;
+  padding: 10px;
+  overflow-y: auto;
+  outline: none;
+}
+
+/* 위젯 크기 조절 핸들 */
+.resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: #f5d742;
+  border-radius: 50%;
+  bottom: 0;
+  right: 0;
+  cursor: nwse-resize;
+} 

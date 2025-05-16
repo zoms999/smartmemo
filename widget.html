@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline';">
+    <title>Memo Widget</title>
+    <link rel="stylesheet" href="widget-style.css">
+</head>
+<body>
+    <div id="widget-container">
+        <div class="widget-header" id="widget-drag-handle">
+            <span id="widget-title">메모</span>
+            <button id="return-to-panel-btn" title="패널로 되돌리기">↩</button> <!-- 되돌리기 아이콘 -->
+            <button id="close-widget-btn" title="위젯 닫기 (패널로 복귀)">×</button>
+        </div>
+        <div id="widget-content" contenteditable="true">
+            <!-- 메모 내용이 여기에 표시됩니다 -->
+        </div>
+    </div>
+    <script src="widget-renderer.js"></script>
+</body>
+</html>

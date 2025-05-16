@@ -1,0 +1,64 @@
+/* widget-style.css */
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background-color: transparent; /* main.js에서 transparent: true */
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 5px; /* 창 자체에 약간의 둥근 모서리 (transparent 때문에 잘 안보일 수 있음) */
+}
+
+#widget-container {
+    width: 100%;
+    height: 100%;
+    background-color: #ffffe0; /* 스티커 메모 같은 노란색 배경 */
+    border: 1px solid #ccc;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    border-radius: 5px; /* 컨테이너에 둥근 모서리 적용 */
+}
+
+.widget-header {
+    background-color: #f0f0f0; /* 약간 어두운 헤더 */
+    padding: 5px 8px;
+    cursor: move; /* 드래그 가능 표시 */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ddd;
+    user-select: none; /* 텍스트 선택 방지 */
+    -webkit-app-region: drag; /* Electron 드래그 영역 지정! 중요 */
+}
+
+.widget-header #widget-title {
+    font-size: 0.9em;
+    color: #333;
+    -webkit-app-region: no-drag; /* 제목 부분은 드래그 안되도록 */
+}
+
+.widget-header button {
+    background: none;
+    border: none;
+    color: #555;
+    font-size: 1em;
+    cursor: pointer;
+    padding: 0 3px;
+    -webkit-app-region: no-drag; /* 버튼은 드래그 영역에서 제외 */
+}
+.widget-header button:hover {
+    color: #000;
+}
+
+#widget-content {
+    padding: 10px;
+    flex-grow: 1;
+    font-size: 0.95em;
+    color: #333;
+    outline: none;
+    overflow-y: auto; /* 내용 많을 시 스크롤 */
+    white-space: pre-wrap; /* 줄바꿈 유지 */
+    word-break: break-word; /* 긴 단어 자동 줄바꿈 */
+}

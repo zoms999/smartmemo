@@ -1,0 +1,82 @@
+{
+  "rules": [
+    {
+      "pattern": "package.json",
+      "languageId": "json",
+      "description": "프로젝트의 의존성, 스크립트 및 메타데이터를 정의합니다. (Defines project dependencies, scripts, and metadata.)"
+    },
+    {
+      "pattern": "main.js",
+      "languageId": "javascript",
+      "description": "Electron 애플리케이션의 메인 프로세스입니다. 창 생성, 시스템 이벤트 처리 등 백엔드 로직을 담당합니다. Supabase 초기화 및 인증 관련 로직이 포함될 수 있습니다. (Electron application's main process. Handles backend logic like window creation, system event handling. May include Supabase initialization and auth-related logic.)"
+    },
+    {
+      "pattern": "preload.js",
+      "languageId": "javascript",
+      "description": "메인 프로세스와 렌더러 프로세스(index.html) 간의 보안 브릿지 역할을 하는 스크립트입니다. Node.js API 및 Electron API의 선택적 노출에 사용됩니다. (Security bridge script between the main process and the renderer process (index.html). Used for selectively exposing Node.js and Electron APIs.)"
+    },
+    {
+      "pattern": "preload-panel.js",
+      "languageId": "javascript",
+      "description": "슬라이드 패널(panel.html)을 위한 프리로드 스크립트입니다. 메인 프로세스와 패널 렌더러 간의 통신을 설정합니다. (Preload script for the slide panel (panel.html). Sets up communication between the main process and the panel renderer.)"
+    },
+    {
+      "pattern": "index.html",
+      "languageId": "html",
+      "description": "기존 메인 메모 앱의 UI 구조입니다. 프로젝트 설명에 따르면 현재 사용되지 않거나 다른 용도로 사용될 수 있습니다. (UI structure for the original main memo app. According to the project description, it might be unused or repurposed.)"
+    },
+    {
+      "pattern": "renderer.js",
+      "languageId": "javascript",
+      "description": "기존 메인 메모 앱의 렌더러 프로세스 로직입니다 (UI 상호작용, DOM 조작). index.html과 연결됩니다. (Renderer process logic for the original main memo app - UI interactions, DOM manipulation. Linked with index.html.)"
+    },
+    {
+      "pattern": "style.css",
+      "languageId": "css",
+      "description": "기존 메인 메모 앱의 스타일 시트입니다. index.html의 시각적 표현을 담당합니다. (Stylesheet for the original main memo app. Responsible for the visual presentation of index.html.)"
+    },
+    {
+      "pattern": "panel.html",
+      "languageId": "html",
+      "description": "슬라이드 패널의 UI 구조입니다. 메모 작성, 관리 등 핵심 기능의 인터페이스를 포함할 가능성이 높습니다. (UI structure for the slide panel. Likely contains the interface for core features like note creation and management.)"
+    },
+    {
+      "pattern": "panel-renderer.js",
+      "languageId": "javascript",
+      "description": "슬라이드 패널의 렌더러 프로세스 로직입니다. panel.html의 UI 상호작용, Supabase 데이터 연동 (CRUD), 마크다운 편집기 로직 등을 처리합니다. (Renderer process logic for the slide panel. Handles UI interactions for panel.html, Supabase data integration (CRUD), Markdown editor logic, etc.)"
+    },
+    {
+      "pattern": "panel-style.css",
+      "languageId": "css",
+      "description": "슬라이드 패널의 스타일 시트입니다. panel.html의 시각적 디자인과 레이아웃을 정의합니다. (Stylesheet for the slide panel. Defines the visual design and layout for panel.html.)"
+    },
+    {
+      "pattern": "assets/**/*",
+      "description": "애플리케이션 아이콘 (icon.png, tray-icon.png) 및 기타 정적 에셋을 포함하는 디렉토리입니다. (Directory containing application icons (icon.png, tray-icon.png) and other static assets.)"
+    },
+    {
+      "pattern": "data/memos.json",
+      "languageId": "json",
+      "description": "로컬 메모 데이터 저장 파일입니다. Supabase가 주 데이터베이스이므로, 초기 데이터, 로컬 백업 또는 가져오기/내보내기 기능에 사용될 수 있습니다. (Local memo data storage file. As Supabase is the primary database, this might be used for initial data, local backup, or import/export functionality.)"
+    },
+    {
+      "pattern": "*.md",
+      "languageId": "markdown",
+      "description": "프로젝트 문서 또는 사용자가 작성한 마크다운 형식의 메모 내용입니다. (Project documentation or user-created notes in Markdown format.)"
+    },
+    {
+      "pattern": ".editorconfig",
+      "description": "프로젝트 전반의 코드 스타일 일관성을 위한 EditorConfig 파일입니다. (EditorConfig file for consistent code styling across the project.)"
+    },
+    {
+      "pattern": "**/*",
+      "description": "MemoWave: Electron, JavaScript, Supabase 기반의 스마트 메모 관리 애플리케이션입니다. 구글 로그인, 마크다운 편집, 데이터 동기화 등의 기능을 제공합니다. (MemoWave: A smart note-taking application built with Electron, JavaScript, and Supabase. Features include Google login, Markdown editing, data synchronization, etc.)",
+      "context": {
+        "framework": "Electron",
+        "language": "JavaScript",
+        "backend": "Supabase (Auth, Database)",
+        "keyFeatures": ["Google Login", "Markdown Editing", "Categories/Tags", "Priority/Alerts", "Data Sync", "Dark Mode"]
+      }
+    }
+  ]
+}
