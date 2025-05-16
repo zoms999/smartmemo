@@ -7,6 +7,7 @@ out/
 
 # 환경 설정 파일 무시
 .env
+db-config.js
 
 # 로그 파일 무시
 *.log
@@ -22,4 +23,4 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo

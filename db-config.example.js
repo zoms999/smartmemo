@@ -1,5 +1,7 @@
-// db-config.js
-// Supabase 연결 정보
+// db-config.example.js
+// Supabase 연결 정보 예시 파일
+// 이 파일을 db-config.js로 복사하고 실제 값을 입력하세요.
+
 module.exports = {
   // Supabase URL (Supabase 프로젝트 설정에서 확인)
   SUPABASE_URL: 'YOUR_SUPABASE_URL',
@@ -9,7 +11,6 @@ module.exports = {
 
   // PostgreSQL 직접 연결 정보
   PG_CONNECTION_STRING: 'postgresql://username:password@host:port/database',
-
 };
 
 // Google OAuth 설정
