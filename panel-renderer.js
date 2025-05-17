@@ -823,10 +823,96 @@ document.addEventListener('DOMContentLoaded', () => {
         panelContainer.classList.add('slide-out');
     });
 
+    // 마크다운 도움말 모달 관련 함수
+    function setupMarkdownModal() {
+        const markdownHintBtn = document.getElementById('markdown-hint-btn');
+        const markdownModal = document.getElementById('markdown-modal');
+        const closeModalBtn = document.getElementById('close-markdown-modal');
+
+        if (markdownHintBtn && markdownModal && closeModalBtn) {
+            // 마크다운 도움말 버튼 클릭 이벤트
+            markdownHintBtn.addEventListener('click', () => {
+                markdownModal.classList.add('show');
+            });
+
+            // 모달 닫기 버튼 이벤트
+            closeModalBtn.addEventListener('click', () => {
+                markdownModal.classList.remove('show');
+            });
+
+            // 모달 바깥 클릭 시 닫기
+            markdownModal.addEventListener('click', (e) => {
+                if (e.target === markdownModal) {
+                    markdownModal.classList.remove('show');
+                }
+            });
+
+            // ESC 키로 모달 닫기
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && markdownModal.classList.contains('show')) {
+                    markdownModal.classList.remove('show');
+                }
+            });
+        }
+    }
+
+    // 테마 토글 기능
+    function setupThemeToggle() {
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        if (themeToggleBtn) {
+            const lightIcon = themeToggleBtn.querySelector('.theme-light-icon');
+            const darkIcon = themeToggleBtn.querySelector('.theme-dark-icon');
+
+            // 현재 테마에 맞게 아이콘 초기 상태 설정
+            updateThemeIcons();
+
+            // 버튼 클릭 이벤트
+            themeToggleBtn.addEventListener('click', async () => {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                // DOM에 새 테마 적용
+                document.documentElement.setAttribute('data-theme', newTheme);
+
+                // 설정 저장
+                const currentSettings = await window.electronAPI.getSettings();
+                const updatedSettings = { ...currentSettings, theme: newTheme };
+                await window.electronAPI.saveSettings(updatedSettings);
+
+                // 아이콘 업데이트
+                updateThemeIcons();
+            });
+        }
+    }
+
+    // 현재 테마에 맞게 아이콘 상태 업데이트
+    function updateThemeIcons() {
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        if (themeToggleBtn) {
+            const lightIcon = themeToggleBtn.querySelector('.theme-light-icon');
+            const darkIcon = themeToggleBtn.querySelector('.theme-dark-icon');
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+
+            if (currentTheme === 'dark') {
+                lightIcon.style.display = 'none';
+                darkIcon.style.display = 'block';
+                themeToggleBtn.title = '라이트 모드로 전환';
+            } else {
+                lightIcon.style.display = 'block';
+                darkIcon.style.display = 'none';
+                themeToggleBtn.title = '다크 모드로 전환';
+            }
+        }
+    }
+
     // 초기화 직접 호출
     console.log('initialize 함수 호출 전');
     initialize().then(() => {
         console.log('초기화 완료');
+
+        // 푸터 관련 기능 설정
+        setupMarkdownModal();
+        setupThemeToggle();
 
         // 초기화 후 버튼 다시 확인
         setTimeout(() => {
