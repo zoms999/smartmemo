@@ -9,7 +9,7 @@
     "dev": "electron . --dev",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
+    "dist:win": "electron-builder --win --publish never",
     "dist:mac": "electron-builder --mac",
     "dist:linux": "electron-builder --linux",
     "postinstall": "electron-builder install-app-deps"
@@ -26,8 +26,12 @@
     "win": {
       "icon": "assets/icon.ico",
       "target": [
-        "nsis"
-      ]
+        {
+          "target": "portable"
+        }
+      ],
+      "artifactName": "${productName}-portable-${version}.${ext}",
+      "signAndEditExecutable": false
     },
     "linux": {
       "icon": "assets/icon.png",
@@ -36,11 +40,6 @@
         "deb"
       ],
       "category": "Utility"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
     },
     "directories": {
       "buildResources": "assets",
@@ -63,7 +62,7 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.9.1"
+    "electron-builder": "^24.13.3"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",

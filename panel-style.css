@@ -937,7 +937,7 @@ input[type="text"] {
 }
 
 .login-button {
-    color: var(--header-text);
+    color: #e74c3c; /* 로그아웃 상태: 빨간색 */
 }
 
 .login-button:hover {
@@ -945,7 +945,7 @@ input[type="text"] {
 }
 
 .login-button.logged-in {
-    color: var(--accent-color);
+    color: #2ecc71; /* 로그인 상태: 녹색 */
 }
 
 .auth-info {
