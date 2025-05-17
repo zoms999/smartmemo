@@ -459,6 +459,33 @@ function setupPanelIpcHandlers() {
     }
   });
 
+  // 인증 상태 확인
+  ipcMain.handle('get-auth-status', async () => {
+    const auth = store.get('auth', { isLoggedIn: false, user: null });
+
+    // 세션이 유효한지 검증
+    if (auth.isLoggedIn && auth.user) {
+      try {
+        const userResult = await db.getCurrentUser();
+        if (userResult.success && userResult.user) {
+          // 최신 사용자 정보 반환
+          return {
+            isLoggedIn: true,
+            user: userResult.user
+          };
+        } else {
+          // 세션이 만료된 경우
+          return { isLoggedIn: false, user: null };
+        }
+      } catch (error) {
+        console.error('인증 상태 확인 오류:', error);
+        return { isLoggedIn: false, user: null };
+      }
+    }
+
+    return auth;
+  });
+
   // 메모 저장하기
   ipcMain.handle('save-memos', async (event, memos) => {
     // 로컬 스토리지에 저장
@@ -1170,7 +1197,7 @@ ipcMain.on('create-widget-from-panel', (event, memo) => {
 ipcMain.handle('update-memo-content-from-widget', async (event, { memoId, newContent }) => {
     // 패널 윈도우에 변경 알림 (패널이 열려 있다면)
     if (panelWindow && !panelWindow.isDestroyed()) {
-        panelWindow.webContents.send('update-memo-from-widget-event', { memoId, newContent });
+        panelWindow.webContents.send('update-memo-from-widget', { memoId, newContent });
     }
     // 실제 파일 저장은 패널측에서 saveMemos를 호출하여 일관성 유지
     return { success: true };

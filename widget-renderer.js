@@ -10,11 +10,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentMemoText = '';
 
     // 초기 메모 데이터 수신
-    window.electronWidgetAPI.onInitializeWidget((memo) => {
+    window.electronWidgetAPI.onInitializeWidget(async (memo) => {
         if (memo && memo.id === currentMemoId) {
             currentMemoText = memo.text;
             widgetContentDiv.textContent = currentMemoText;
-            widgetTitle.textContent = memo.text.substring(0, 10) + (memo.text.length > 10 ? '...' : ''); // 간단한 제목
+
+            // 메모 제목 설정 (첫 줄만 사용하여 [object Promise] 방지)
+            const firstLine = memo.text.split('\n')[0] || memo.text;
+            const truncatedText = firstLine.substring(0, 10) + (firstLine.length > 10 ? '...' : '');
+            widgetTitle.textContent = truncatedText;
         }
     });
 
@@ -26,7 +30,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const newText = widgetContentDiv.textContent;
             if (newText !== currentMemoText) {
                 currentMemoText = newText;
-                widgetTitle.textContent = newText.substring(0, 10) + (newText.length > 10 ? '...' : '');
+
+                // 메모 제목 설정 (첫 줄만 사용하여 [object Promise] 방지)
+                const firstLine = newText.split('\n')[0] || newText;
+                const truncatedText = firstLine.substring(0, 10) + (firstLine.length > 10 ? '...' : '');
+                widgetTitle.textContent = truncatedText;
+
                 if (currentMemoId) {
                     await window.electronWidgetAPI.updateContent(currentMemoId, newText);
                 }

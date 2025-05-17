@@ -45,74 +45,77 @@ const electronAPI = {
     // 메모 데이터 관리
     getMemos: createLoggedHandler('get-memos'),
     saveMemos: createLoggedHandler('save-memos'),
-    
+
     // 카테고리 관리
     getCategories: createLoggedHandler('get-categories'),
     saveCategories: createLoggedHandler('save-categories'),
-    
+
     // 태그 관리
     getTags: createLoggedHandler('get-tags'),
     saveTags: createLoggedHandler('save-tags'),
-    
+
+    // 인증 관련
+    getAuthStatus: createLoggedHandler('get-auth-status'),
+
     // 패널 제어
     closePanel: createLoggedSender('close-panel'),
-    
+
     // 패널 애니메이션 이벤트 수신
     onPanelSlideIn: createLoggedReceiver('panel-slide-in'),
     onPanelSlideOut: createLoggedReceiver('panel-slide-out'),
-    
+
     // 위젯 관련 기능
     createWidget: createLoggedHandler('create-widget'),
-    
+
     // 위젯에서 내용 변경 시 패널에 알림 수신
     onMemoUpdateFromWidget: createLoggedReceiver('update-memo-from-widget'),
-    
+
     // 위젯 창 닫힐 때 알림 수신
     onWidgetClosed: createLoggedReceiver('widget-closed'),
-    
+
     // 위젯의 위치/크기 변경 시 알림 수신 (패널에서 데이터 업데이트용)
     onUpdateMemoWidgetState: createLoggedReceiver('update-memo-widget-state'),
-    
+
     // 메모 포커스 요청
     onShowPanelAndFocusMemo: createLoggedReceiver('show-panel-and-focus-memo'),
-    
+
     // 설정 관련 API
     getSettings: createLoggedHandler('get-settings'),
     updateSettings: createLoggedHandler('update-settings'),
     getAppVersion: createLoggedHandler('get-app-version'),
-    
+
     // 앱 정보 창 및 설정 창 열기
     openAboutWindow: createLoggedSender('open-about-window'),
     openSettingsWindow: createLoggedSender('open-settings-window'),
-    
+
     // 업데이트 관련 이벤트 수신
     onUpdateAvailable: createLoggedReceiver('update-available'),
     onUpdateProgress: createLoggedReceiver('update-progress'),
     onUpdateDownloaded: createLoggedReceiver('update-downloaded'),
-    
+
     // 외부 링크 열기
     openExternalLink: createLoggedSender('open-external-link'),
-    
+
     // 마크다운 변환
     convertMarkdown: createLoggedHandler('convert-markdown'),
-    
+
     // 이미지 첨부
     selectImage: createLoggedHandler('select-image'),
-    
+
     // 리마인더 설정
     scheduleReminder: createLoggedHandler('schedule-reminder'),
-    
+
     // 데이터 내보내기/가져오기
     exportData: createLoggedHandler('export-data'),
     importData: createLoggedHandler('import-data'),
-    
+
     // 데이터베이스 관련 함수
     deleteMemoFromDb: createLoggedHandler('delete-memo-from-db'),
-    
+
     // 인증 관련 함수
     getAuthState: createLoggedHandler('get-auth-state'),
     signOut: createLoggedHandler('sign-out'),
-    
+
     // 로그인 창 열기 - 직접 함수 정의로 변경
     openLoginWindow: () => {
         console.log('openLoginWindow 함수 직접 호출됨');

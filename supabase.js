@@ -81,6 +81,10 @@ async function createSchema() {
 // 메모 저장 함수
 async function saveMemoToDb(memo) {
   try {
+    // 현재 로그인한 사용자 정보 가져오기
+    const userResult = await getCurrentUser();
+    const userId = userResult.success && userResult.user ? userResult.user.id : null;
+
     const { data, error } = await supabase
       .from('memos')
       .upsert({
@@ -96,7 +100,8 @@ async function saveMemoToDb(memo) {
         created_at: memo.createdAt || new Date().toISOString(),
         updated_at: new Date().toISOString(),
         widget_position: memo.widgetPosition,
-        widget_size: memo.widgetSize
+        widget_size: memo.widgetSize,
+        user_id: userId // 사용자 ID 추가
       });
 
     if (error) throw error;
@@ -110,9 +115,21 @@ async function saveMemoToDb(memo) {
 // 메모 목록 가져오기 함수
 async function getMemosFromDb() {
   try {
+    // 현재 로그인한 사용자 정보 가져오기
+    const userResult = await getCurrentUser();
+    const userId = userResult.success && userResult.user ? userResult.user.id : null;
+
+    // 로그인하지 않은 경우 빈 배열 반환
+    if (!userId) {
+      console.log('로그인하지 않은 사용자: 빈 메모 목록 반환');
+      return { success: true, memos: [] };
+    }
+
+    // 사용자 ID로 필터링하여 메모 가져오기
     const { data, error } = await supabase
       .from('memos')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -143,10 +160,22 @@ async function getMemosFromDb() {
 // 메모 삭제 함수
 async function deleteMemoFromDb(memoId) {
   try {
+    // 현재 로그인한 사용자 정보 가져오기
+    const userResult = await getCurrentUser();
+    const userId = userResult.success && userResult.user ? userResult.user.id : null;
+
+    // 로그인하지 않은 경우 오류 반환
+    if (!userId) {
+      console.log('로그인하지 않은 사용자: 메모 삭제 불가');
+      return { success: false, error: '로그인이 필요합니다.' };
+    }
+
+    // 사용자 ID로 필터링하여 메모 삭제
     const { error } = await supabase
       .from('memos')
       .delete()
-      .eq('id', memoId);
+      .eq('id', memoId)
+      .eq('user_id', userId);  // 사용자 본인의 메모만 삭제 가능
 
     if (error) throw error;
     return { success: true };
