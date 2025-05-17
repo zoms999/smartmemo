@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const panelContainer = document.querySelector('.panel-container');
     const searchInput = document.getElementById('search-memo');
     const categorySelect = document.getElementById('category-filter');
-    const tagSelect = document.getElementById('tag-filter');
+    const prioritySelect = document.getElementById('priority-filter');
     const sortSelect = document.getElementById('sort-order');
     const toolbar = document.getElementById('markdown-toolbar');
     const exportBtn = document.getElementById('export-btn');
@@ -25,9 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let categories = [];
     let tags = [];
     let settings = {};
-    let activeFilters = {
+    const activeFilters = {
         category: 'all',
-        tag: 'all',
+        priority: 'all',
         searchTerm: '',
         sortOrder: 'newest'
     };
@@ -44,33 +44,38 @@ document.addEventListener('DOMContentLoaded', () => {
         const categoryDropdown = document.getElementById('new-memo-category');
         const existingValue = categoryDropdown.value;
 
+        console.log('카테고리 드롭다운 업데이트 시작', { 현재선택값: existingValue, 사용가능카테고리: categories });
+
         // 드롭다운 비우기
         categoryDropdown.innerHTML = '<option value="">카테고리 없음</option>';
 
         // 카테고리 옵션 추가
-        categories.forEach(category => {
+        for (const category of categories) {
             const option = document.createElement('option');
             option.value = category.id;
             option.textContent = category.name;
             categoryDropdown.appendChild(option);
-        });
+        }
 
         // 이전 값 복원
         if (existingValue) {
             categoryDropdown.value = existingValue;
+            console.log('이전 카테고리 값 복원:', existingValue, '현재 설정된 값:', categoryDropdown.value);
         }
     }
 
     // 초기화 함수 - 애플리케이션 시작 시 호출
     async function initialize() {
         try {
+            console.log('애플리케이션 초기화 시작');
+
             // 설정 로드
             settings = await window.electronAPI.getSettings();
             applySettings();
 
             // 로그인 상태 확인
             const auth = await window.electronAPI.getAuthStatus();
-            const isLoggedIn = auth && auth.isLoggedIn;
+            const isLoggedIn = auth?.isLoggedIn;
 
             // 로그인 버튼 상태 업데이트
             updateAuthButtonState(isLoggedIn, auth?.user);
@@ -80,12 +85,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 카테고리 로드
             categories = await window.electronAPI.getCategories();
+            console.log('초기 카테고리 로드됨:', categories);
+
+            // 카테고리 ID가 숫자인지 확인
+            categories = categories.map(category => {
+                if (typeof category.id === 'string') {
+                    category.id = Number.parseInt(category.id, 10);
+                }
+                return category;
+            });
+            console.log('처리된 카테고리:', categories);
 
             // 태그 로드
             tags = await window.electronAPI.getTags();
+            console.log('초기 태그 로드됨:', tags);
 
             // 메모 로드
             await loadMemosFromStorage();
+            console.log('초기화: 메모 로드 완료');
 
             // 로그인 상태에 따른 UI 조정
             if (!isLoggedIn) {
@@ -94,6 +111,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 필터 UI 업데이트
             updateFilterUI();
+            console.log('초기화: 필터 UI 업데이트 완료');
+
+            // 카테고리 드롭다운 업데이트
+            updateCategoryDropdown();
+            console.log('초기화: 카테고리 드롭다운 업데이트 완료');
 
             // 이벤트 리스너 등록
             setupEventListeners();
@@ -189,23 +211,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 필터 UI 업데이트
     function updateFilterUI() {
+        console.log('필터 UI 업데이트 시작', {카테고리목록: categories, 태그목록: tags});
+
         // 카테고리 옵션 업데이트
         categorySelect.innerHTML = '<option value="all">모든 카테고리</option>';
-        categories.forEach(category => {
+        for (const category of categories) {
             const option = document.createElement('option');
             option.value = category.id;
             option.textContent = category.name;
             categorySelect.appendChild(option);
-        });
+            console.log('카테고리 옵션 추가:', category.id, category.name);
+        }
 
-        // 태그 옵션 업데이트
-        tagSelect.innerHTML = '<option value="all">모든 태그</option>';
-        tags.forEach(tag => {
+        // 우선순위 옵션 업데이트
+        prioritySelect.innerHTML = '<option value="all">모든 우선순위</option>';
+        for (const priority of ['0', '1', '2']) {
             const option = document.createElement('option');
-            option.value = tag;
-            option.textContent = tag;
-            tagSelect.appendChild(option);
-        });
+            option.value = priority;
+            option.textContent = priority === '0' ? '일반' : (priority === '1' ? '중요' : '긴급');
+            prioritySelect.appendChild(option);
+        }
+
+        console.log('필터 UI 업데이트 완료');
     }
 
     // 이벤트 리스너 설정
@@ -240,26 +267,33 @@ document.addEventListener('DOMContentLoaded', () => {
         closeBtn.addEventListener('click', closePanel);
 
         // 필터 변경 이벤트
-        const categorySelect = document.getElementById('category-filter');
-        const tagSelect = document.getElementById('tag-filter');
-        const sortSelect = document.getElementById('sort-order');
-        const searchInput = document.getElementById('search-memo');
-        const clearSearchBtn = document.getElementById('clear-search-btn');
+        console.log('필터 이벤트 리스너 설정 시작');
+
+        // 이미 상단에서 선언된 변수 재사용
+        console.log('카테고리 필터 요소:', categorySelect ? '찾음' : '못찾음');
+        console.log('우선순위 필터 요소:', prioritySelect ? '찾음' : '못찾음');
+        console.log('정렬 필터 요소:', sortSelect ? '찾음' : '못찾음');
+        console.log('검색 입력 요소:', searchInput ? '찾음' : '못찾음');
 
         categorySelect.addEventListener('change', () => {
+            console.log('카테고리 필터 변경됨:', categorySelect.value);
             activeFilters.category = categorySelect.value;
             renderMemos();
         });
 
-        tagSelect.addEventListener('change', () => {
-            activeFilters.tag = tagSelect.value;
+        prioritySelect.addEventListener('change', () => {
+            console.log('우선순위 필터 변경됨:', prioritySelect.value);
+            activeFilters.priority = prioritySelect.value;
             renderMemos();
         });
 
         sortSelect.addEventListener('change', () => {
+            console.log('정렬 필터 변경됨:', sortSelect.value);
             activeFilters.sortOrder = sortSelect.value;
             renderMemos();
         });
+
+        const clearSearchBtn = document.getElementById('clear-search-btn');
 
         // 검색 이벤트 - 입력 지연 처리
         searchInput.addEventListener('input', debounce(() => {
@@ -304,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 위젯 닫힘 이벤트
         window.electronAPI.onWidgetClosed((memoId) => {
-            const memoToUpdate = memos.find(memo => memo.id === parseInt(memoId, 10));
+            const memoToUpdate = memos.find(memo => memo.id === Number.parseInt(memoId, 10));
             if (memoToUpdate) {
                 memoToUpdate.isWidget = false;
                 saveMemosToStorage();
@@ -429,38 +463,77 @@ document.addEventListener('DOMContentLoaded', () => {
     // 메모 렌더링
     async function renderMemos() {
         memosContainer.innerHTML = '';
+        console.log('메모 렌더링 시작, 현재 필터 상태:', activeFilters);
 
         // 필터링
         let filteredMemos = memos;
+        console.log('필터링 전 메모 수:', filteredMemos.length);
 
         // 검색어 필터링
         if (activeFilters.searchTerm) {
             filteredMemos = filteredMemos.filter(memo =>
                 memo.text.toLowerCase().includes(activeFilters.searchTerm)
             );
+            console.log('검색어 필터링 후 메모 수:', filteredMemos.length);
         }
 
         // 카테고리 필터링
         if (activeFilters.category !== 'all') {
-            filteredMemos = filteredMemos.filter(memo =>
-                memo.categoryId === parseInt(activeFilters.category, 10)
-            );
+            console.log('카테고리 필터링 적용: 선택된 카테고리 ID =', activeFilters.category, '타입:', typeof activeFilters.category);
+
+            // 메모 카테고리 ID 타입 확인
+            const memoCategories = filteredMemos.map(m => ({
+                id: m.id,
+                categoryId: m.categoryId,
+                categoryType: typeof m.categoryId,
+                text: m.text.substring(0, 10)
+            }));
+            console.log('필터링 전 메모 카테고리 정보:', memoCategories);
+
+            // 카테고리 ID를 숫자로 변환
+            const categoryId = Number.parseInt(activeFilters.category, 10);
+            console.log('변환된 카테고리 ID(숫자):', categoryId);
+
+            // 필터링 - 숫자 비교
+            filteredMemos = filteredMemos.filter(memo => {
+                // 카테고리 ID 타입 확인 및 변환
+                let memoCatId = memo.categoryId;
+                if (typeof memoCatId === 'string' && memoCatId !== '') {
+                    memoCatId = Number.parseInt(memoCatId, 10);
+                }
+
+                const result = memoCatId === categoryId;
+                console.log(`메모 ID ${memo.id}, 카테고리 ID ${memo.categoryId}(${typeof memo.categoryId}) vs ${categoryId}, 필터 결과: ${result}`);
+                return result;
+            });
+
+            console.log('카테고리 필터링 후 메모 수:', filteredMemos.length);
+
+            // 카테고리 필터링 결과가 없으면 사용자에게 더 명확한 피드백 제공
+            if (filteredMemos.length === 0) {
+                // 필터 중인 카테고리 이름 찾기
+                const categoryName = categories.find(c => c.id === categoryId)?.name || '알 수 없음';
+                console.log(`'${categoryName}' 카테고리에 해당하는 메모가 없습니다.`);
+            }
         }
 
-        // 태그 필터링
-        if (activeFilters.tag !== 'all') {
+        // 우선순위 필터링
+        if (activeFilters.priority !== 'all') {
             filteredMemos = filteredMemos.filter(memo =>
-                memo.tags && memo.tags.includes(activeFilters.tag)
+                memo.priority?.toString() === activeFilters.priority
             );
+            console.log('우선순위 필터링 후 메모 수:', filteredMemos.length);
         }
 
         // 위젯 필터링 (위젯으로 나와있는 메모는 기본적으로 표시하지 않음, 검색 시에만 표시)
-        if (!activeFilters.searchTerm && !activeFilters.category !== 'all' && !activeFilters.tag !== 'all') {
+        if (!activeFilters.searchTerm && activeFilters.category === 'all' && activeFilters.priority === 'all') {
             filteredMemos = filteredMemos.filter(memo => !memo.isWidget);
+            console.log('위젯 필터링 후 메모 수:', filteredMemos.length);
         }
 
         // 정렬
         filteredMemos = sortMemos(filteredMemos, activeFilters.sortOrder);
+        console.log('정렬 완료, 최종 표시 메모 수:', filteredMemos.length);
 
         // 결과 없음 메시지
         if (filteredMemos.length === 0) {
@@ -510,7 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // 내용 변경 시 저장
             editModeDiv.addEventListener('blur', async (event) => {
                 const newText = event.target.textContent;
-                const memoId = parseInt(memoDiv.dataset.id, 10);
+                const memoId = Number.parseInt(memoDiv.dataset.id, 10);
                 const memoToUpdate = memos.find(m => m.id === memoId);
 
                 if (memoToUpdate && memoToUpdate.text !== newText) {
@@ -680,18 +753,53 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // 추가 디버깅 정보 출력
+        console.log('카테고리 선택 요소:', categorySelect);
+        console.log('카테고리 선택값(raw):', categorySelect.value);
+        console.log('카테고리 선택된 옵션:', categorySelect.options[categorySelect.selectedIndex]);
+
+        // 선택된 카테고리 값 가져오기 - 문자열이 아닌 숫자로 변환
+        let categoryId = null;
+        if (categorySelect.value && categorySelect.value !== "") {
+            // 직접 숫자로 변환 (Number.parseInt + Number.isNaN으로 안전하게 검증)
+            const parsedId = Number.parseInt(categorySelect.value, 10);
+            categoryId = Number.isNaN(parsedId) ? null : parsedId;
+            console.log('선택된 카테고리 ID(숫자형):', categoryId, typeof categoryId);
+        }
+
+        console.log('새 메모 추가 - 선택된 카테고리 값(원본):', categorySelect.value, typeof categorySelect.value);
+        console.log('새 메모 추가 - 선택된 우선순위:', prioritySelect.value);
+
+        // 선택된 카테고리 이름 가져오기 (디버깅용)
+        let categoryName = '없음';
+        if (categoryId) {
+            const selectedCategory = categories.find(cat => cat.id === categoryId);
+            categoryName = selectedCategory ? selectedCategory.name : '없음';
+            console.log('카테고리 찾기 결과:', selectedCategory);
+        }
+        console.log('새 메모 추가 - 카테고리 이름:', categoryName);
+
+        // 타임스탬프 기반 ID 생성 (고유 값 보장)
+        const memo_id = Date.now();
+
+        // 카테고리 ID를 최종 확인 (진짜 null 또는 진짜 숫자만)
+        console.log('최종 카테고리 ID 타입 확인:', typeof categoryId);
+        console.log('최종 카테고리 ID 값 확인:', categoryId);
+
         const newMemo = {
-            id: Date.now(), // 현재 시간을 ID로 사용 (고유한 값)
+            id: memo_id,
             text: text,
             isWidget: false,
-            categoryId: categorySelect.value ? parseInt(categorySelect.value, 10) : null,
-            priority: parseInt(prioritySelect.value, 10),
+            categoryId: categoryId, // 정확한 숫자 또는 null
+            priority: Number.parseInt(prioritySelect.value, 10),
             tags: [],
             color: null,
             reminder: null,
             images: [],
             createdAt: new Date().toISOString()
         };
+
+        console.log('새 메모 객체 (저장 전):', JSON.stringify(newMemo));
 
         memos.unshift(newMemo); // 배열 맨 앞에 추가
         saveMemosToStorage();
@@ -737,7 +845,50 @@ document.addEventListener('DOMContentLoaded', () => {
     // 메모 저장
     async function saveMemosToStorage() {
         try {
-            await window.electronAPI.saveMemos(memos);
+            console.log('저장 전 메모 확인:', memos.map(m => ({
+                id: m.id,
+                text: m.text.substring(0, 15),
+                categoryId: m.categoryId,
+                categoryType: typeof m.categoryId
+            })));
+
+            // 저장 전에 메모 객체의 카테고리 ID가 제대로 숫자 형태인지 확인
+            const sanitizedMemos = memos.map(memo => {
+                // 깊은 복사를 통해 새 객체 생성
+                const newMemo = {...memo};
+
+                // categoryId가 문자열이면 숫자로 변환
+                if (typeof newMemo.categoryId === 'string' && newMemo.categoryId !== '') {
+                    const parsedId = Number.parseInt(newMemo.categoryId, 10);
+                    newMemo.categoryId = Number.isNaN(parsedId) ? null : parsedId;
+                    console.log(`메모 ID ${newMemo.id}의 카테고리ID를 문자열에서 숫자로 변환: ${memo.categoryId} -> ${newMemo.categoryId}`);
+                }
+
+                // 카테고리 ID가 null이고 categoryId가 '[NULL]'과 같은 문자열이면 null로 확실히 설정
+                if (newMemo.categoryId === '[NULL]' || newMemo.categoryId === 'null' || newMemo.categoryId === '') {
+                    console.log(`메모 ID ${newMemo.id}의 카테고리ID를 null로 설정: ${memo.categoryId} -> null`);
+                    newMemo.categoryId = null;
+                }
+
+                return newMemo;
+            });
+
+            console.log('sanitizedMemos 최종 확인:', sanitizedMemos.map(m => ({
+                id: m.id,
+                text: m.text.substring(0, 15),
+                categoryId: m.categoryId,
+                categoryType: typeof m.categoryId
+            })));
+
+            // 직접 백엔드 요청 데이터 확인
+            console.log('백엔드로 전송되는 JSON 데이터:', JSON.stringify(sanitizedMemos));
+
+            // 저장 전에 데이터 직접 출력해서 확인
+            console.log('✅ 카테고리 ID 체크:',
+                sanitizedMemos.map(m => `메모 ID: ${m.id}, 카테고리 ID: ${m.categoryId}, 타입: ${typeof m.categoryId}`).join('\n'));
+
+            const result = await window.electronAPI.saveMemos(sanitizedMemos);
+            console.log('메모 저장 결과:', result);
         } catch (error) {
             console.error('메모 저장 오류:', error);
             showErrorNotification('메모 저장 중 오류가 발생했습니다.');
@@ -748,6 +899,32 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadMemosFromStorage() {
         try {
             memos = await window.electronAPI.getMemos();
+            console.log('메모 로드 완료, 로드된 메모 수:', memos.length);
+
+            // 로드된 메모의 카테고리 ID가 제대로 숫자 형태인지 확인
+            memos = memos.map(memo => {
+                // 카테고리 ID가 문자열이면 숫자로 변환
+                if (typeof memo.categoryId === 'string' && memo.categoryId !== '') {
+                    const numericId = Number.parseInt(memo.categoryId, 10);
+                    console.log(`메모 ID ${memo.id}의 카테고리ID를 문자열에서 숫자로 변환: ${memo.categoryId} -> ${numericId}`);
+                    memo.categoryId = numericId;
+                }
+
+                // 카테고리 ID가 null이고 categoryId가 '[NULL]'과 같은 문자열이면 null로 확실히 설정
+                if (memo.categoryId === '[NULL]' || memo.categoryId === 'null' || memo.categoryId === '') {
+                    console.log(`메모 ID ${memo.id}의 카테고리ID를 null로 설정: ${memo.categoryId} -> null`);
+                    memo.categoryId = null;
+                }
+
+                return memo;
+            });
+
+            console.log('메모 처리 후 상태 확인:', memos.map(m => ({
+                id: m.id,
+                text: m.text.substring(0, 15),
+                categoryId: m.categoryId,
+                categoryType: typeof m.categoryId
+            })));
         } catch (error) {
             console.error('메모 로드 오류:', error);
             showErrorNotification('메모 로드 중 오류가 발생했습니다.');
@@ -788,7 +965,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 이벤트 리스너
-    addMemoBtn.addEventListener('click', addMemo);
+    addMemoBtn.addEventListener('click', () => {
+        console.log('메모 추가 버튼 클릭됨');
+        addMemo();
+    });
     memoInput.addEventListener('keypress', (event) => {
         if (event.key === 'Enter') {
             addMemo();
@@ -805,11 +985,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // debounce 유틸리티 함수
     function debounce(func, wait) {
         let timeout;
-        return function() {
-            const context = this, args = arguments;
+        return (...args) => {
             clearTimeout(timeout);
             timeout = setTimeout(() => {
-                func.apply(context, args);
+                func(...args);
             }, wait);
         };
     }
@@ -945,22 +1124,52 @@ function setupAddMemoButton() {
     const newMemoCategory = document.getElementById('new-memo-category');
     const newMemoPriority = document.getElementById('new-memo-priority');
 
+    console.log('setupAddMemoButton: 메모 추가 버튼 설정 시작');
+
+    // 카테고리 선택 변경 이벤트 추가
+    newMemoCategory.addEventListener('change', function() {
+        console.log('새 메모 카테고리 선택됨:', this.value, typeof this.value);
+        if (this.selectedIndex >= 0) {
+            console.log('선택된 옵션 텍스트:', this.options[this.selectedIndex].text);
+        }
+    });
+
     // 기존 카테고리로 드롭다운 채우기
     updateCategoryDropdown();
+    console.log('카테고리 드롭다운 업데이트됨');
 
     // 메모 추가 이벤트
-    addMemoBtn.addEventListener('click', addMemo);
+    addMemoBtn.addEventListener('click', () => {
+        console.log('메모 추가 버튼 클릭됨');
+        addMemo();
+    });
 
     // 엔터 키로 메모 추가 (Shift+Enter는 줄바꿈)
     memoInput.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' && !event.shiftKey && event.target.value.trim()) {
             event.preventDefault();
+            console.log('Enter 키 눌림 - 메모 추가');
             addMemo();
         }
     });
 
+    // 카테고리 드롭다운 재점검
+    setTimeout(() => {
+        const dropdown = document.getElementById('new-memo-category');
+        console.log('카테고리 드롭다운 지연 점검:',
+            dropdown ? '찾음' : '못찾음',
+            dropdown ? `옵션 ${dropdown.options.length}개` : '');
+
+        if (dropdown && dropdown.options.length <= 1 && categories.length > 0) {
+            console.log('카테고리 드롭다운 재구성');
+            updateCategoryDropdown();
+        }
+    }, 1000);
+
     // 마크다운 툴바 이벤트 연결
     setupMarkdownToolbar();
+
+    console.log('setupAddMemoButton: 메모 추가 버튼 설정 완료');
 }
 
 // 마크다운 툴바 설정
@@ -968,7 +1177,7 @@ function setupMarkdownToolbar() {
     const toolbarButtons = document.querySelectorAll('.toolbar-btn');
     const memoInput = document.getElementById('memo-input');
 
-    toolbarButtons.forEach(button => {
+    for (const button of toolbarButtons) {
         button.addEventListener('click', () => {
             // 현재 선택된 텍스트 정보 가져오기
             const start = memoInput.selectionStart;
@@ -1003,7 +1212,7 @@ function setupMarkdownToolbar() {
                         // 커서를 url에 위치시키기 위해 오프셋 계산
                         cursorOffset = 3;
                     } else {
-                        formattedText = `[링크 텍스트](url)`;
+                        formattedText = '[링크 텍스트](url)';
                         // 커서를 링크 텍스트 시작 부분에 위치
                         cursorOffset = 1;
                     }
@@ -1046,7 +1255,7 @@ function setupMarkdownToolbar() {
                 memoInput.focus();
             }
         });
-    });
+    }
 }
 
 // 이미지 첨부 다이얼로그
@@ -1274,28 +1483,24 @@ function setupAuthButton() {
 
 // 로그인/로그아웃 처리
 async function handleAuthAction(event) {
-    console.log('handleAuthAction 함수 호출됨', event);
-
     try {
         // 이벤트가 있으면 기본 동작 방지
-        if (event && event.preventDefault) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
 
         // 현재 로그인 상태 확인
         const auth = await window.electronAPI.getAuthStatus();
-        const isLoggedIn = auth && auth.isLoggedIn;
+        const isLoggedIn = auth?.isLoggedIn;
 
         if (isLoggedIn) {
             // 로그인 상태라면 아무 작업 안함 (마우스 오버가 처리)
             return;
-        } else {
-            // 로그인 상태가 아니라면 로그인 페이지 열기
-            console.log('로그인 페이지 열기 시도');
-            window.electronAPI.openLoginWindow();
-            console.log('openLoginWindow 호출 완료');
         }
+
+        // 로그인 상태가 아니라면 로그인 페이지 열기
+        console.log('로그인 페이지 열기 시도');
+        window.electronAPI.openLoginWindow();
+        console.log('openLoginWindow 호출 완료');
     } catch (error) {
         console.error('인증 처리 오류:', error);
     }

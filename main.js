@@ -488,22 +488,63 @@ function setupPanelIpcHandlers() {
 
   // 메모 저장하기
   ipcMain.handle('save-memos', async (event, memos) => {
+    // 메모 데이터 정제 (카테고리 ID 처리)
+    const sanitizedMemos = memos.map(memo => {
+      // 카테고리 ID가 문자열인 경우 숫자로 변환
+      if (typeof memo.categoryId === 'string' && memo.categoryId.trim() !== '') {
+        const parsedId = parseInt(memo.categoryId, 10);
+        if (!Number.isNaN(parsedId)) {
+          memo.categoryId = parsedId;
+          console.log(`[메인 프로세스] 메모 ID ${memo.id}의 카테고리 ID를 숫자로 변환: ${parsedId}`);
+        } else {
+          memo.categoryId = null;
+          console.log(`[메인 프로세스] 메모 ID ${memo.id}의 카테고리 ID 변환 실패, null로 설정`);
+        }
+      }
+
+      // 특수 문자열 값을 null로 처리
+      if (memo.categoryId === '[NULL]' || memo.categoryId === 'null' || memo.categoryId === '') {
+        memo.categoryId = null;
+        console.log(`[메인 프로세스] 메모 ID ${memo.id}의 categoryId '[NULL]' 값을 null로 처리`);
+      }
+
+      // undefined 값을 null로 처리
+      if (typeof memo.categoryId === 'undefined') {
+        memo.categoryId = null;
+        console.log(`[메인 프로세스] 메모 ID ${memo.id}의 undefined categoryId를 null로 처리`);
+      }
+
+      return memo;
+    });
+
+    console.log('[메인 프로세스] 저장 전 메모 데이터 샘플:',
+      sanitizedMemos.slice(0, 3).map(m => ({
+        id: m.id,
+        text: m.text.substring(0, 15),
+        categoryId: m.categoryId,
+        categoryIdType: typeof m.categoryId
+      }))
+    );
+
     // 로컬 스토리지에 저장
-    store.set('memos', memos);
+    store.set('memos', sanitizedMemos);
 
     // DB에 저장 시도
     try {
       // 각 메모를 DB에 저장
-      for (const memo of memos) {
-        await db.saveMemoToDb(memo);
+      for (const memo of sanitizedMemos) {
+        const result = await db.saveMemoToDb(memo);
+        if (!result.success) {
+          console.error(`[메인 프로세스] 메모 ID ${memo.id} 저장 실패:`, result.error);
+        }
       }
     } catch (error) {
-      console.error('DB에 메모 저장 실패:', error);
+      console.error('[메인 프로세스] DB에 메모 저장 실패:', error);
       // 실패해도 로컬에는 저장되었으므로 계속 진행
     }
 
     // 위젯으로 표시된 메모들 업데이트
-    memos.forEach(memo => {
+    sanitizedMemos.forEach(memo => {
       if (memo.reminder) {
         scheduleReminder(memo);
       }

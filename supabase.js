@@ -85,13 +85,32 @@ async function saveMemoToDb(memo) {
     const userResult = await getCurrentUser();
     const userId = userResult.success && userResult.user ? userResult.user.id : null;
 
+    // 카테고리 ID 처리
+    let categoryId = memo.categoryId;
+
+    // 타입 체크 및 변환 (정수 타입인지 확인)
+    if (typeof categoryId === 'string' && categoryId.trim() !== '') {
+      const parsedId = parseInt(categoryId, 10);
+      categoryId = !Number.isNaN(parsedId) ? parsedId : null;
+      console.log(`Supabase: 문자열 카테고리 ID를 숫자로 변환: "${memo.categoryId}" → ${categoryId}`);
+    }
+
+    // 특수 문자열 및 비정상 값 체크
+    if (categoryId === '[NULL]' || categoryId === 'null' || categoryId === '') {
+      categoryId = null;
+      console.log(`Supabase: 특수 문자열 카테고리 ID를 null로 처리: "${memo.categoryId}"`);
+    }
+
+    // 데이터베이스에 저장할 데이터 로깅
+    console.log(`Supabase: 메모 ID ${memo.id} 저장 시도, 카테고리 ID: ${categoryId}, 타입: ${typeof categoryId}`);
+
     const { data, error } = await supabase
       .from('memos')
       .upsert({
         id: memo.id,
         text: memo.text,
         is_widget: memo.isWidget || false,
-        category_id: memo.categoryId,
+        category_id: categoryId, // 처리된 카테고리 ID 사용
         priority: memo.priority || 0,
         tags: memo.tags || [],
         color: memo.color,
@@ -104,10 +123,15 @@ async function saveMemoToDb(memo) {
         user_id: userId // 사용자 ID 추가
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`Supabase: 메모 저장 오류 발생:`, error);
+      throw error;
+    }
+
+    console.log(`Supabase: 메모 ID ${memo.id} 저장 성공`);
     return { success: true, data };
   } catch (error) {
-    console.error('메모 저장 오류:', error.message);
+    console.error('Supabase: 메모 저장 오류:', error.message);
     return { success: false, error: error.message };
   }
 }
