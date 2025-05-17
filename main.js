@@ -1,9 +1,9 @@
 // main.js
 const { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, screen, nativeTheme, dialog, shell, globalShortcut, Notification } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const http = require('http');
-const url = require('url');
+const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
+const url = require('node:url');
 const Store = require('electron-store');
 const { autoUpdater } = require('electron-updater');
 const marked = require('marked');
@@ -203,27 +203,28 @@ function migrateDataIfNeeded() {
   let needsMigration = false;
 
   memos = memos.map(memo => {
-    if (!memo.hasOwnProperty('categoryId')) {
+    // Object.hasOwn 사용으로 변경 (린터 오류 수정)
+    if (!Object.hasOwn(memo, 'categoryId')) {
       memo.categoryId = null;
       needsMigration = true;
     }
-    if (!memo.hasOwnProperty('tags')) {
+    if (!Object.hasOwn(memo, 'tags')) {
       memo.tags = [];
       needsMigration = true;
     }
-    if (!memo.hasOwnProperty('color')) {
+    if (!Object.hasOwn(memo, 'color')) {
       memo.color = null;
       needsMigration = true;
     }
-    if (!memo.hasOwnProperty('priority')) {
+    if (!Object.hasOwn(memo, 'priority')) {
       memo.priority = 0; // 0: 일반, 1: 중요, 2: 긴급
       needsMigration = true;
     }
-    if (!memo.hasOwnProperty('reminder')) {
+    if (!Object.hasOwn(memo, 'reminder')) {
       memo.reminder = null;
       needsMigration = true;
     }
-    if (!memo.hasOwnProperty('images')) {
+    if (!Object.hasOwn(memo, 'images')) {
       memo.images = [];
       needsMigration = true;
     }
@@ -336,111 +337,123 @@ function createTray() {
 
 // 설정 창 열기 함수
 function openSettingsWindow() {
-  if (settingsWindow) {
-    settingsWindow.focus();
-    return;
-  }
+    // 이미 열려있으면 포커스
+    if (settingsWindow) {
+        settingsWindow.focus();
+        return;
+    }
 
-  settingsWindow = new BrowserWindow({
-    width: 450,
-    height: 500,
-    title: '설정',
-    resizable: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-settings.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    },
-    icon: path.join(__dirname, 'assets', 'icon.png')
-  });
+    settingsWindow = new BrowserWindow({
+        width: 600,
+        height: 700,
+        title: '설정',
+        icon: path.join(__dirname, 'assets', 'try_icon.png'),  // 변경: 새 아이콘 사용
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
 
-  settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
-  // settingsWindow.webContents.openDevTools({ mode: 'detach' });
+    settingsWindow.loadFile(path.join(__dirname, 'settings.html'));
+    // settingsWindow.webContents.openDevTools({ mode: 'detach' });
 
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
+    settingsWindow.on('closed', () => {
+        settingsWindow = null;
+    });
 }
 
 // 앱 정보 창 열기 함수
 function openAboutWindow() {
-  if (aboutWindow) {
-    aboutWindow.focus();
-    return;
-  }
+    if (aboutWindow) {
+        aboutWindow.focus();
+        return;
+    }
 
-  aboutWindow = new BrowserWindow({
-    width: 400,
-    height: 350,
-    resizable: false,
-    title: '앱 정보',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-about.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    },
-    icon: path.join(__dirname, 'assets', 'icon.png')
-  });
+    aboutWindow = new BrowserWindow({
+        width: 400,
+        height: 500,
+        resizable: false,
+        title: 'MemoWave 정보',
+        webPreferences: {
+            preload: path.join(__dirname, 'preload-about.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+        },
+        icon: tryIconPath // 변경된 아이콘 적용
+    });
 
-  aboutWindow.loadFile(path.join(__dirname, 'about.html'));
+    aboutWindow.loadFile(path.join(__dirname, 'about.html'));
 
-  aboutWindow.on('closed', () => {
-    aboutWindow = null;
-  });
+    aboutWindow.on('closed', () => {
+        aboutWindow = null;
+    });
 }
 
 function createPanelWindow() {
-  if (panelWindow) return;  // 이미 존재한다면 다시 생성하지 않음
+    panelWindow = new BrowserWindow({
+        width: PANEL_WIDTH,
+        height: screen.getPrimaryDisplay().workAreaSize.height,
+        x: screen.getPrimaryDisplay().workAreaSize.width - PANEL_WIDTH,
+        y: 0,
+        frame: false,
+        resizable: false,
+        skipTaskbar: true,
+        show: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload-panel.js'),
+            nodeIntegration: false,
+            contextIsolation: true
+        },
+        icon: appIconPath // 메인 아이콘 유지
+    });
 
-  // 주 디스플레이 가져오기
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    panelWindow.loadFile('panel.html');
 
-  // 패널 윈도우 생성
-  panelWindow = new BrowserWindow({
-    width: PANEL_WIDTH,
-    height: height,
-    x: width,  // 화면 오른쪽 가장자리에 위치
-    y: 0,      // 화면 맨 위에 위치
-    frame: false,
-    transparent: true,
-    resizable: false,
-    skipTaskbar: true,
-    alwaysOnTop: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload-panel.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      enableRemoteModule: false
-    },
-    icon: path.join(__dirname, 'assets', 'icon.png')
-  });
+    // 개발 모드에서는 개발자 도구 표시
+    if (process.argv.includes('--dev')) {
+        panelWindow.webContents.openDevTools({ mode: 'detach' });
+    }
 
+    // 창을 닫을 때 이벤트
+    panelWindow.on('closed', () => {
+        panelWindow = null;
+    });
 
-  panelWindow.loadFile('panel.html');
+    // 초기 상태는 숨김
+    if (panelWindow) {
+        panelWindow.hide();
+    }
 
-  // 개발 모드에서는 개발자 도구 표시
-  if (process.argv.includes('--dev')) {
-    panelWindow.webContents.openDevTools({ mode: 'detach' });
-  }
-
-  // 창을 닫을 때 이벤트
-  panelWindow.on('closed', () => {
-    panelWindow = null;
-  });
-
-  // 초기 상태는 숨김
-  if (panelWindow) {
-    panelWindow.hide();
-  }
-
-  // IPC 이벤트 핸들러 등록
-  setupPanelIpcHandlers();
+    // IPC 이벤트 핸들러 등록
+    setupPanelIpcHandlers();
 }
+
+// 이미 등록된 IPC 핸들러 이름을 추적하기 위한 전역 Set
+const registeredHandlers = new Set();
+
+// 이미 등록된 핸들러 제거를 위한 헬퍼 함수
+const safelyRegisterHandler = (channel, handler) => {
+  try {
+    // 이미 등록된 핸들러가 있다면 제거 시도
+    if (registeredHandlers.has(channel)) {
+      console.log(`[메인 프로세스] 기존 '${channel}' 핸들러 제거 시도`);
+      ipcMain.removeHandler(channel);
+    }
+
+    // 새 핸들러 등록
+    ipcMain.handle(channel, handler);
+    registeredHandlers.add(channel);
+    console.log(`[메인 프로세스] '${channel}' 핸들러 등록 완료`);
+  } catch (error) {
+    console.error(`[메인 프로세스] '${channel}' 핸들러 등록 오류:`, error);
+  }
+};
 
 // 패널 관련 IPC 핸들러 설정
 function setupPanelIpcHandlers() {
   // 저장된 메모 가져오기
-  ipcMain.handle('get-memos', async () => {
+  safelyRegisterHandler('get-memos', async () => {
     try {
       // DB에서 메모 로드 시도
       const result = await db.getMemosFromDb();
@@ -460,7 +473,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 인증 상태 확인
-  ipcMain.handle('get-auth-status', async () => {
+  safelyRegisterHandler('get-auth-status', async () => {
     const auth = store.get('auth', { isLoggedIn: false, user: null });
 
     // 세션이 유효한지 검증
@@ -487,12 +500,12 @@ function setupPanelIpcHandlers() {
   });
 
   // 메모 저장하기
-  ipcMain.handle('save-memos', async (event, memos) => {
+  safelyRegisterHandler('save-memos', async (event, memos) => {
     // 메모 데이터 정제 (카테고리 ID 처리)
     const sanitizedMemos = memos.map(memo => {
       // 카테고리 ID가 문자열인 경우 숫자로 변환
       if (typeof memo.categoryId === 'string' && memo.categoryId.trim() !== '') {
-        const parsedId = parseInt(memo.categoryId, 10);
+        const parsedId = Number.parseInt(memo.categoryId, 10);
         if (!Number.isNaN(parsedId)) {
           memo.categoryId = parsedId;
           console.log(`[메인 프로세스] 메모 ID ${memo.id}의 카테고리 ID를 숫자로 변환: ${parsedId}`);
@@ -544,7 +557,7 @@ function setupPanelIpcHandlers() {
     }
 
     // 위젯으로 표시된 메모들 업데이트
-    sanitizedMemos.forEach(memo => {
+    for (const memo of sanitizedMemos) {
       if (memo.reminder) {
         scheduleReminder(memo);
       }
@@ -556,18 +569,18 @@ function setupPanelIpcHandlers() {
           widgetWindow.webContents.send('update-widget-content', memo);
         }
       }
-    });
+    }
 
     return true;
   });
 
   // 설정 가져오기
-  ipcMain.handle('get-settings', async () => {
+  safelyRegisterHandler('get-settings', async () => {
     return store.get('settings');
   });
 
   // 카테고리 가져오기
-  ipcMain.handle('get-categories', async () => {
+  safelyRegisterHandler('get-categories', async () => {
     try {
       // DB에서 카테고리 로드 시도
       const result = await db.getCategoriesFromDb();
@@ -587,7 +600,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 카테고리 저장하기
-  ipcMain.handle('save-categories', async (event, categories) => {
+  safelyRegisterHandler('save-categories', async (event, categories) => {
     // 로컬 스토리지에 저장
     store.set('categories', categories);
 
@@ -603,7 +616,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 태그 가져오기
-  ipcMain.handle('get-tags', async () => {
+  safelyRegisterHandler('get-tags', async () => {
     try {
       // DB에서 태그 로드 시도
       const result = await db.getTagsFromDb();
@@ -623,7 +636,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 태그 저장하기
-  ipcMain.handle('save-tags', async (event, tags) => {
+  safelyRegisterHandler('save-tags', async (event, tags) => {
     // 로컬 스토리지에 저장
     store.set('tags', tags);
 
@@ -639,7 +652,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 데이터베이스에서 메모 삭제
-  ipcMain.handle('delete-memo-from-db', async (event, memoId) => {
+  safelyRegisterHandler('delete-memo-from-db', async (event, memoId) => {
     try {
       const result = await db.deleteMemoFromDb(memoId);
       return result;
@@ -650,13 +663,13 @@ function setupPanelIpcHandlers() {
   });
 
   // 위젯 생성
-  ipcMain.handle('create-widget', async (event, memo) => {
+  safelyRegisterHandler('create-widget', async (event, memo) => {
     createWidgetWindow(memo);
     return true;
   });
 
   // 이미지 첨부를 위한 파일 선택 대화상자
-  ipcMain.handle('select-image', async () => {
+  safelyRegisterHandler('select-image', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
       filters: [
@@ -698,7 +711,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 메모 데이터 내보내기
-  ipcMain.handle('export-data', async () => {
+  safelyRegisterHandler('export-data', async () => {
     const result = await dialog.showSaveDialog({
       title: '메모 데이터 내보내기',
       defaultPath: path.join(app.getPath('documents'), 'memowave-backup.json'),
@@ -727,7 +740,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 메모 데이터 가져오기
-  ipcMain.handle('import-data', async () => {
+  safelyRegisterHandler('import-data', async () => {
     const result = await dialog.showOpenDialog({
       title: '메모 데이터 가져오기',
       properties: ['openFile'],
@@ -772,7 +785,7 @@ function setupPanelIpcHandlers() {
   });
 
   // 마크다운 변환
-  ipcMain.handle('convert-markdown', async (event, text) => {
+  safelyRegisterHandler('convert-markdown', async (event, text) => {
     try {
       return marked.parse(text);
     } catch (error) {
@@ -942,6 +955,9 @@ async function initializeApp() {
     } catch (error) {
         console.error('[메인 프로세스] OAuth 콜백용 로컬 HTTP 서버 시작 실패:', error);
     }
+
+    // Auth IPC 핸들러 설정 (한 번만 호출)
+    setupAuthIpcHandlers();
 
     // 데이터베이스 연결 테스트
     try {
@@ -1135,9 +1151,6 @@ function setupGlobalShortcut() {
 // 앱 준비 완료 이벤트
 app.whenReady().then(async () => {
   console.log('앱 준비 완료');
-
-  // 로그인 IPC 핸들러 설정
-  setupAuthIpcHandlers();
 
   // Windows에서 프로토콜 핸들러 등록 강화
   if (process.platform === 'win32') {
@@ -1410,33 +1423,22 @@ function togglePanelVisibility() {
 
 // 로그인 창 생성
 function createLoginWindow() {
-  console.log('[메인 프로세스] createLoginWindow 함수 시작');
-
-  try {
-    if (loginWindow && !loginWindow.isDestroyed()) {
-      console.log('[메인 프로세스] 기존 로그인 창 존재, 포커스만 변경');
-      loginWindow.focus();
-      return;
+    if (loginWindow) {
+        loginWindow.focus();
+        return;
     }
 
-    // 기존 패널 숨기기
-    if (panelWindow && !panelWindow.isDestroyed()) {
-      console.log('[메인 프로세스] 패널 숨김 처리');
-      hidePanel();
-    }
-
-    console.log('[메인 프로세스] 새 로그인 창 생성');
     loginWindow = new BrowserWindow({
-      width: 450,
-      height: 550,
-      resizable: false,
-      frame: true,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload-login.js'),
-        contextIsolation: true,
-        nodeIntegration: false
-      },
-      icon: path.join(__dirname, 'assets', 'icon.png')
+        width: 480,
+        height: 600,
+        resizable: false,
+        title: 'MemoWave 로그인',
+        webPreferences: {
+            preload: path.join(__dirname, 'preload-login.js'),
+            contextIsolation: true,
+            nodeIntegration: false
+        },
+        icon: tryIconPath // 변경된 아이콘 적용
     });
 
     loginWindow.loadFile(path.join(__dirname, 'login.html'));
@@ -1459,9 +1461,6 @@ function createLoginWindow() {
     });
 
     console.log('[메인 프로세스] 로그인 창 생성 완료');
-  } catch (error) {
-    console.error('[메인 프로세스] 로그인 창 생성 오류:', error);
-  }
 }
 
 // 로그인 상태 확인
@@ -1787,7 +1786,7 @@ async function handleOAuthCallback(callbackUrl) { // async 키워드 추가
 // 로그인 관련 IPC 핸들러 설정
 function setupAuthIpcHandlers() {
   // 구글 로그인 요청
-  ipcMain.handle('sign-in-with-google', async () => {
+  safelyRegisterHandler('sign-in-with-google', async () => {
     try {
       console.log('메인 프로세스: IPC sign-in-with-google 요청 받음');
       const result = await db.signInWithGoogle();
@@ -1808,7 +1807,7 @@ function setupAuthIpcHandlers() {
   });
 
   // 수동으로 액세스 토큰 URL 처리하기 (브라우저에서 받은 URL을 수동으로 처리)
-  ipcMain.handle('process-oauth-callback', async (event, url) => {
+  safelyRegisterHandler('process-oauth-callback', async (event, url) => {
     console.log('메인 프로세스: 수동 OAuth 콜백 처리 요청 받음, URL 길이:', url.length);
     console.log('메인 프로세스: 수동 입력된 URL 시작 부분:', url.substring(0, 50) + '...');
     console.log('메인 프로세스: access_token 포함 여부:', url.includes('access_token'));
@@ -1854,29 +1853,13 @@ function setupAuthIpcHandlers() {
     }
   });
 
-  // 로그인 건너뛰기
-  ipcMain.on('skip-login', () => {
-    console.log('메인 프로세스: IPC skip-login 요청 받음');
-    store.set('auth', {
-      user: null,
-      isLoggedIn: false,
-      skipLogin: true
-    });
-
-    // 로그인 창 닫기
-    if (loginWindow && !loginWindow.isDestroyed()) {
-      loginWindow.close();
-    }
-
-    // 패널 윈도우 생성
-    createPanelWindow();
-
-    // 위젯 복원
-    restoreWidgets();
+  // 현재 로그인 상태 가져오기
+  safelyRegisterHandler('get-auth-state', async () => {
+    return store.get('auth');
   });
 
   // 로그아웃
-  ipcMain.handle('sign-out', async () => {
+  safelyRegisterHandler('sign-out', async () => {
     try {
       const result = await db.signOut();
       if (result.success) {
@@ -1913,10 +1896,35 @@ function setupAuthIpcHandlers() {
     }
   });
 
-  // 현재 로그인 상태 가져오기
-  ipcMain.handle('get-auth-state', async () => {
-    return store.get('auth');
-  });
+  // on 이벤트는 removeHandler로 처리할 수 없으므로 개별 처리
+  // 로그인 건너뛰기
+  try {
+    // 등록 전 기존 이벤트 리스너 제거 시도
+    ipcMain.removeAllListeners('skip-login');
+    console.log('[메인 프로세스] skip-login 이벤트 리스너 재설정 완료');
+
+    ipcMain.on('skip-login', () => {
+      console.log('메인 프로세스: IPC skip-login 요청 받음');
+      store.set('auth', {
+        user: null,
+        isLoggedIn: false,
+        skipLogin: true
+      });
+
+      // 로그인 창 닫기
+      if (loginWindow && !loginWindow.isDestroyed()) {
+        loginWindow.close();
+      }
+
+      // 패널 윈도우 생성
+      createPanelWindow();
+
+      // 위젯 복원
+      restoreWidgets();
+    });
+  } catch (error) {
+    console.error('[메인 프로세스] skip-login 이벤트 리스너 설정 오류:', error);
+  }
 }
 
 // OAuth 콜백을 처리하는 로컬 HTTP 서버 시작 함수
@@ -2330,3 +2338,7 @@ function enhanceProtocolRegistration() {
     console.error('프로토콜 등록 강화 중 오류 발생:', error);
   }
 }
+
+// 아이콘 경로 상수 정의
+const appIconPath = path.join(__dirname, 'assets', 'icon.png');
+const tryIconPath = path.join(__dirname, 'assets', 'try_icon.png');

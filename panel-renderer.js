@@ -69,6 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log('애플리케이션 초기화 시작');
 
+            // 메모 입력 영역 토글 버튼 설정
+            setupMemoEditorToggle();
+
             // 설정 로드
             settings = await window.electronAPI.getSettings();
             applySettings();
@@ -223,14 +226,30 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('카테고리 옵션 추가:', category.id, category.name);
         }
 
-        // 우선순위 옵션 업데이트
+        // 우선순위 옵션 업데이트 - 아이콘 추가
         prioritySelect.innerHTML = '<option value="all">모든 우선순위</option>';
-        for (const priority of ['0', '1', '2']) {
-            const option = document.createElement('option');
-            option.value = priority;
-            option.textContent = priority === '0' ? '일반' : (priority === '1' ? '중요' : '긴급');
-            prioritySelect.appendChild(option);
-        }
+
+        // 일반 우선순위
+        const option0 = document.createElement('option');
+        option0.value = '0';
+        option0.textContent = '일반';
+        prioritySelect.appendChild(option0);
+
+        // 중요 우선순위
+        const option1 = document.createElement('option');
+        option1.value = '1';
+        option1.textContent = '⭐ 중요';
+        option1.style.fontWeight = 'bold';
+        option1.style.color = '#ff9800';
+        prioritySelect.appendChild(option1);
+
+        // 긴급 우선순위
+        const option2 = document.createElement('option');
+        option2.value = '2';
+        option2.textContent = '🔥 긴급';
+        option2.style.fontWeight = 'bold';
+        option2.style.color = '#f44336';
+        prioritySelect.appendChild(option2);
 
         console.log('필터 UI 업데이트 완료');
     }
@@ -248,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             authButton.addEventListener('mouseenter', async (e) => {
                 // 현재 로그인 상태 확인
                 const auth = await window.electronAPI.getAuthStatus();
-                const isLoggedIn = auth && auth.isLoggedIn;
+                const isLoggedIn = auth?.isLoggedIn;
 
                 // 로그인된 상태일 때만 드롭다운 메뉴 표시
                 if (isLoggedIn) {
@@ -556,9 +575,31 @@ document.addEventListener('DOMContentLoaded', () => {
             memoDiv.classList.add('memo-item');
             memoDiv.dataset.id = memo.id;
 
+            // 우선순위에 따른 클래스 추가
+            if (memo.priority) {
+                const priorityClass = `priority-${memo.priority}`;
+                memoDiv.classList.add(priorityClass);
+            }
+
             // 메모 내용을 담을 컨테이너
             const contentContainer = document.createElement('div');
             contentContainer.classList.add('memo-content-container');
+
+            // 우선순위 뱃지 추가
+            if (memo.priority > 0) {
+                const priorityBadge = document.createElement('div');
+                priorityBadge.classList.add('priority-badge');
+
+                if (memo.priority === 1) {
+                    priorityBadge.textContent = '중요';
+                    priorityBadge.classList.add('priority-important');
+                } else if (memo.priority === 2) {
+                    priorityBadge.textContent = '긴급';
+                    priorityBadge.classList.add('priority-urgent');
+                }
+
+                contentContainer.appendChild(priorityBadge);
+            }
 
             // 미리보기 모드와 편집 모드를 위한 요소들
             const viewModeDiv = document.createElement('div');
@@ -672,22 +713,138 @@ document.addEventListener('DOMContentLoaded', () => {
     function toggleEditMode(isEdit, memoDiv) {
         const viewMode = memoDiv.querySelector('.view-mode');
         const editMode = memoDiv.querySelector('.edit-mode');
+        const memoId = Number.parseInt(memoDiv.dataset.id, 10);
+        const memoToEdit = memos.find(m => m.id === memoId);
 
         if (isEdit) {
+            // 편집 모드로 전환
             viewMode.style.display = 'none';
             editMode.style.display = 'block';
             editMode.focus();
 
-            // 커서를 끝으로 이동
-            const range = document.createRange();
-            const sel = window.getSelection();
-            range.selectNodeContents(editMode);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
+            // 편집 컨트롤 추가
+            const editControls = document.createElement('div');
+            editControls.classList.add('edit-controls');
+
+            // 우선순위 변경 드롭다운
+            const prioritySelect = document.createElement('select');
+            prioritySelect.classList.add('edit-priority-select');
+
+            const option0 = document.createElement('option');
+            option0.value = '0';
+            option0.textContent = '일반';
+            option0.selected = memoToEdit.priority === 0;
+            prioritySelect.appendChild(option0);
+
+            const option1 = document.createElement('option');
+            option1.value = '1';
+            option1.textContent = '⭐ 중요';
+            option1.selected = memoToEdit.priority === 1;
+            prioritySelect.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = '2';
+            option2.textContent = '🔥 긴급';
+            option2.selected = memoToEdit.priority === 2;
+            prioritySelect.appendChild(option2);
+
+            // 우선순위 변경 이벤트
+            prioritySelect.addEventListener('change', () => {
+                memoToEdit.priority = Number.parseInt(prioritySelect.value, 10);
+                saveMemosToStorage();
+            });
+
+            const priorityLabel = document.createElement('label');
+            priorityLabel.textContent = '우선순위: ';
+            priorityLabel.appendChild(prioritySelect);
+
+            editControls.appendChild(priorityLabel);
+
+            // 카테고리 변경 드롭다운
+            if (categories.length > 0) {
+                const categorySelect = document.createElement('select');
+                categorySelect.classList.add('edit-category-select');
+
+                const noCategoryOption = document.createElement('option');
+                noCategoryOption.value = '';
+                noCategoryOption.textContent = '카테고리 없음';
+                noCategoryOption.selected = !memoToEdit.categoryId;
+                categorySelect.appendChild(noCategoryOption);
+
+                for (const category of categories) {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    option.selected = memoToEdit.categoryId === category.id;
+                    categorySelect.appendChild(option);
+                }
+
+                // 카테고리 변경 이벤트
+                categorySelect.addEventListener('change', () => {
+                    const value = categorySelect.value;
+                    memoToEdit.categoryId = value ? Number.parseInt(value, 10) : null;
+                    saveMemosToStorage();
+                });
+
+                const categoryLabel = document.createElement('label');
+                categoryLabel.textContent = '카테고리: ';
+                categoryLabel.appendChild(categorySelect);
+
+                editControls.appendChild(categoryLabel);
+            }
+
+            // 저장 버튼
+            const saveButton = document.createElement('button');
+            saveButton.textContent = '저장';
+            saveButton.classList.add('save-edit-btn');
+            saveButton.addEventListener('click', () => {
+                editMode.blur();
+            });
+
+            editControls.appendChild(saveButton);
+
+            // 컨트롤 추가
+            if (!memoDiv.querySelector('.edit-controls')) {
+                memoDiv.appendChild(editControls);
+            }
         } else {
+            // 보기 모드로 전환
             viewMode.style.display = 'block';
             editMode.style.display = 'none';
+
+            // 편집 컨트롤 제거
+            const editControls = memoDiv.querySelector('.edit-controls');
+            if (editControls) {
+                memoDiv.removeChild(editControls);
+            }
+
+            // 우선순위 클래스 업데이트
+            memoDiv.className = 'memo-item';
+            if (memoToEdit.priority) {
+                memoDiv.classList.add(`priority-${memoToEdit.priority}`);
+            }
+
+            // 우선순위 뱃지 업데이트
+            const existingBadge = memoDiv.querySelector('.priority-badge');
+            if (existingBadge) {
+                existingBadge.remove();
+            }
+
+            if (memoToEdit.priority > 0) {
+                const contentContainer = memoDiv.querySelector('.memo-content-container');
+                const priorityBadge = document.createElement('div');
+                priorityBadge.classList.add('priority-badge');
+
+                if (memoToEdit.priority === 1) {
+                    priorityBadge.textContent = '중요';
+                    priorityBadge.classList.add('priority-important');
+                } else if (memoToEdit.priority === 2) {
+                    priorityBadge.textContent = '긴급';
+                    priorityBadge.classList.add('priority-urgent');
+                }
+
+                contentContainer.insertBefore(priorityBadge, contentContainer.firstChild);
+            }
         }
     }
 
@@ -803,13 +960,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
         memos.unshift(newMemo); // 배열 맨 앞에 추가
         saveMemosToStorage();
-        renderMemos();
+
+        // 메모 렌더링 후 새 메모로 스크롤
+        renderMemos().then(() => {
+            // 새 메모 요소 찾기
+            const newMemoElement = document.querySelector(`.memo-item[data-id="${memo_id}"]`);
+            if (newMemoElement) {
+                // 부드럽게 스크롤
+                newMemoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // 새 메모 강조 효과
+                newMemoElement.classList.add('new-memo');
+                setTimeout(() => {
+                    newMemoElement.classList.remove('new-memo');
+                }, 2000);
+            }
+
+            // 성공 메시지 표시
+            const priorityText = newMemo.priority === 1 ? '중요' : (newMemo.priority === 2 ? '긴급' : '일반');
+            const categoryText = categoryName !== '없음' ? `${categoryName} 카테고리에 ` : '';
+            showToast(`${priorityText} 메모가 ${categoryText}추가되었습니다.`);
+        });
 
         // 입력 필드 초기화
         memoInput.value = '';
 
-        // 성공 메시지 표시
-        showToast('메모가 추가되었습니다.');
+        // 입력 필드에 포커스
+        memoInput.focus();
     }
 
     // 메모 삭제
@@ -1084,6 +1261,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 메모 입력 영역 표시/숨김 토글 함수 추가
+    function toggleMemoEditor() {
+        const editorContainer = document.getElementById('memo-editor-container');
+        const toggleBtn = document.getElementById('toggle-editor-btn');
+
+        if (editorContainer.classList.contains('collapsed')) {
+            // 확장
+            editorContainer.classList.remove('collapsed');
+            editorContainer.style.height = 'auto';
+            toggleBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="currentColor" d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14l-6-6z"></path>
+                </svg>
+                <span>접기</span>
+            `;
+            toggleBtn.title = "입력 영역 접기";
+        } else {
+            // 접기
+            editorContainer.classList.add('collapsed');
+            editorContainer.style.height = '42px';
+            toggleBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                    <path fill="currentColor" d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6-1.41-1.41z"></path>
+                </svg>
+                <span>펼치기</span>
+            `;
+            toggleBtn.title = "입력 영역 펼치기";
+        }
+    }
+
+    // 마크다운 툴바 토글 함수
+    function toggleMarkdownToolbar() {
+        const toolbar = document.getElementById('markdown-toolbar');
+        const toolbarToggleBtn = document.getElementById('toggle-toolbar-btn');
+
+        if (toolbar.style.display === 'none') {
+            toolbar.style.display = 'flex';
+            toolbarToggleBtn.textContent = '툴바 숨기기';
+        } else {
+            toolbar.style.display = 'none';
+            toolbarToggleBtn.textContent = '툴바 보기';
+        }
+    }
+
     // 초기화 직접 호출
     console.log('initialize 함수 호출 전');
     initialize().then(() => {
@@ -1100,11 +1321,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 디버깅을 위해 창에 전역 변수로 노출
             window.debugAuth = {
-                openLoginWindow: function() {
+                openLoginWindow: () => {
                     console.log('디버그 메서드로 로그인 창 열기 시도');
                     window.electronAPI.openLoginWindow();
                 },
-                checkButton: function() {
+                checkButton: () => {
                     const btn = document.getElementById('auth-button');
                     console.log('현재 auth-button 상태:', btn ? '존재' : '없음');
                     return btn;
@@ -1115,6 +1336,68 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch(err => {
         console.error('초기화 오류:', err);
     });
+
+    // 메모 에디터 토글 설정
+    function setupMemoEditorToggle() {
+        const memoEditorContainer = document.getElementById('memo-editor-container');
+        const searchAndFilter = document.querySelector('.search-and-filter');
+
+        // 토글 버튼 컨테이너 추가
+        const toggleContainer = document.createElement('div');
+        toggleContainer.classList.add('toggle-container');
+
+        // 에디터 토글 버튼
+        const toggleEditorBtn = document.createElement('button');
+        toggleEditorBtn.id = 'toggle-editor-btn';
+        toggleEditorBtn.classList.add('toggle-btn');
+        toggleEditorBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14l-6-6z"></path>
+            </svg>
+            <span>입력 영역 접기</span>
+        `;
+        toggleEditorBtn.title = "입력 영역 접기";
+        toggleEditorBtn.addEventListener('click', toggleMemoEditor);
+
+        // 툴바 토글 버튼
+        const toggleToolbarBtn = document.createElement('button');
+        toggleToolbarBtn.id = 'toggle-toolbar-btn';
+        toggleToolbarBtn.classList.add('toggle-btn');
+        toggleToolbarBtn.textContent = '툴바 숨기기';
+        toggleToolbarBtn.addEventListener('click', toggleMarkdownToolbar);
+
+        // 컴팩트 모드 토글 버튼
+        const compactModeBtn = document.createElement('button');
+        compactModeBtn.id = 'compact-mode-btn';
+        compactModeBtn.classList.add('toggle-btn');
+
+        // 이전 상태 확인해서 버튼 텍스트 설정
+        const isCompact = localStorage.getItem('memo-compact-mode') === 'true';
+        if (isCompact) {
+            compactModeBtn.textContent = '확장 모드';
+            compactModeBtn.title = '메모를 더 크게 표시';
+            // 컴팩트 모드 클래스 적용
+            const memosContainer = document.getElementById('memos-container');
+            if (memosContainer) {
+                memosContainer.classList.add('compact-mode');
+            }
+        } else {
+            compactModeBtn.textContent = '컴팩트 모드';
+            compactModeBtn.title = '메모를 더 작게 표시';
+        }
+
+        compactModeBtn.addEventListener('click', toggleCompactMode);
+
+        // 버튼들을 컨테이너에 추가
+        toggleContainer.appendChild(toggleToolbarBtn);
+        toggleContainer.appendChild(compactModeBtn);
+        toggleContainer.appendChild(toggleEditorBtn);
+
+        // 컨테이너를 필터 영역 다음에 삽입
+        if (searchAndFilter && !document.querySelector('.toggle-container')) {
+            searchAndFilter.after(toggleContainer);
+        }
+    }
 });
 
 // 메모 추가 버튼 이벤트 연결
@@ -1473,7 +1756,7 @@ function setupAuthButton() {
 
         // 로그인 상태 확인 후 클릭 이벤트 다시 설정
         window.electronAPI.getAuthStatus().then(auth => {
-            const isLoggedIn = auth && auth.isLoggedIn;
+            const isLoggedIn = auth?.isLoggedIn;
             if (!isLoggedIn) {
                 authButton.addEventListener('click', handleLoginClick);
             }
@@ -1549,4 +1832,24 @@ function handleLoginClick(e) {
 
     // 로그인 창 열기
     window.electronAPI.openLoginWindow();
+}
+
+// 컴팩트 모드 토글 함수
+function toggleCompactMode() {
+    const memosContainer = document.getElementById('memos-container');
+    const compactBtn = document.getElementById('compact-mode-btn');
+
+    // 컴팩트 모드 상태 토글
+    const isCompact = memosContainer.classList.toggle('compact-mode');
+
+    // 버튼 텍스트 업데이트
+    if (isCompact) {
+        compactBtn.textContent = '확장 모드';
+        compactBtn.title = '메모를 더 크게 표시';
+        localStorage.setItem('memo-compact-mode', 'true');
+    } else {
+        compactBtn.textContent = '컴팩트 모드';
+        compactBtn.title = '메모를 더 작게 표시';
+        localStorage.setItem('memo-compact-mode', 'false');
+    }
 }
