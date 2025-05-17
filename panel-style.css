@@ -391,11 +391,24 @@ input[type="text"] {
     border-left: 4px solid var(--primary-color);
     max-height: 120px;
     overflow-y: auto;
+    transition: box-shadow 0.3s, opacity 0.3s, transform 0.15s;
+    cursor: default;
 }
 
 .memo-item:hover {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
+}
+
+.memo-item.dragging {
+    opacity: 0.8;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    background-color: var(--memo-bg);
+    border: 2px dashed var(--primary-color);
+    position: relative;
+    z-index: 10;
+    transform: scale(1.02);
+    cursor: grabbing !important;
 }
 
 /* 하이라이트 효과 */
@@ -473,6 +486,27 @@ input[type="text"] {
 /* 메모 내용 */
 .memo-content-container {
     margin-top: 6px;
+    cursor: grab;
+    position: relative;
+}
+
+.memo-content-container:hover::before {
+    content: '';
+    position: absolute;
+    left: -5px;
+    top: 0;
+    height: 100%;
+    width: 3px;
+    background-color: var(--border-color);
+    border-radius: 2px;
+}
+
+.memo-content-container:active {
+    cursor: grabbing;
+}
+
+.memo-content-container:active::before {
+    background-color: var(--primary-color);
 }
 
 .memo-content {
@@ -1464,4 +1498,33 @@ button:hover {
     padding: 0 3px;
     margin: 0 3px 3px 0;
     font-size: 0.7em;
+}
+
+/* 드롭 영역 표시 */
+.memo-item.drop-target-above {
+    border-top: 2px solid var(--primary-color);
+    padding-top: 6px; /* 테두리 두께 보상 */
+    animation: pulse-border-top 1s infinite alternate;
+}
+
+.memo-item.drop-target-below {
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 6px; /* 테두리 두께 보상 */
+    animation: pulse-border-bottom 1s infinite alternate;
+}
+
+@keyframes pulse-border-top {
+    from { border-top-color: var(--primary-color); }
+    to { border-top-color: var(--accent-color); }
+}
+
+@keyframes pulse-border-bottom {
+    from { border-bottom-color: var(--primary-color); }
+    to { border-bottom-color: var(--accent-color); }
+}
+
+/* 드래그 대상 외 메모 스타일 */
+.memo-item.potential-drop-target {
+    transition: transform 0.15s, opacity 0.15s;
+    opacity: 0.8;
 }

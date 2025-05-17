@@ -76,6 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
             settings = await window.electronAPI.getSettings();
             applySettings();
 
+            // 드래그 앤 드롭을 위한 메모 컨테이너 설정
+            setupDragAndDrop();
+
             // 로그인 상태 확인
             const auth = await window.electronAPI.getAuthStatus();
             const isLoggedIn = auth?.isLoggedIn;
@@ -86,30 +89,53 @@ document.addEventListener('DOMContentLoaded', () => {
             // 로그인 버튼에 추가 이벤트 리스너 설정
             setupAuthButton();
 
-            // 카테고리 로드
-            categories = await window.electronAPI.getCategories();
-            console.log('초기 카테고리 로드됨:', categories);
-
-            // 카테고리 ID가 숫자인지 확인
-            categories = categories.map(category => {
-                if (typeof category.id === 'string') {
-                    category.id = Number.parseInt(category.id, 10);
-                }
-                return category;
-            });
-            console.log('처리된 카테고리:', categories);
-
-            // 태그 로드
-            tags = await window.electronAPI.getTags();
-            console.log('초기 태그 로드됨:', tags);
-
-            // 메모 로드
-            await loadMemosFromStorage();
-            console.log('초기화: 메모 로드 완료');
-
             // 로그인 상태에 따른 UI 조정
             if (!isLoggedIn) {
                 showLoginPrompt();
+                // 로그인되지 않은 경우에는 기본 카테고리만 표시
+                categories = [
+                    { id: 1, name: '업무', color: '#4a6da7' },
+                    { id: 2, name: '개인', color: '#8bc34a' },
+                    { id: 3, name: '아이디어', color: '#ff9800' },
+                    { id: 4, name: '할일', color: '#9c27b0' }
+                ];
+                tags = ['중요', '긴급', '후속조치', '참고'];
+                console.log('로그인되지 않음: 기본 카테고리 사용');
+            } else {
+                try {
+                    // 카테고리 로드
+                    categories = await window.electronAPI.getCategories();
+                    console.log('초기 카테고리 로드됨:', categories);
+
+                    // 카테고리 ID가 숫자인지 확인
+                    categories = categories.map(category => {
+                        if (typeof category.id === 'string') {
+                            category.id = Number.parseInt(category.id, 10);
+                        }
+                        return category;
+                    });
+                    console.log('처리된 카테고리:', categories);
+
+                    // 태그 로드
+                    tags = await window.electronAPI.getTags();
+                    console.log('초기 태그 로드됨:', tags);
+
+                    // 메모 로드
+                    await loadMemosFromStorage();
+                    console.log('초기화: 메모 로드 완료');
+                                } catch (dataError) {
+                    console.error('데이터 로드 오류:', dataError);
+                    showErrorNotification('데이터 로드 중 오류가 발생했습니다. 다시 로그인해 보세요.');
+
+                    // 오류 발생 시 기본값 사용
+                    categories = [
+                        { id: 1, name: '업무', color: '#4a6da7' },
+                        { id: 2, name: '개인', color: '#8bc34a' },
+                        { id: 3, name: '아이디어', color: '#ff9800' },
+                        { id: 4, name: '할일', color: '#9c27b0' }
+                    ];
+                    tags = ['중요', '긴급', '후속조치', '참고'];
+                }
             }
 
             // 필터 UI 업데이트
@@ -122,6 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // 이벤트 리스너 등록
             setupEventListeners();
+
+            // 로그인 오류 핸들러 설정
+            setupLoginErrorHandler();
 
             console.log('애플리케이션 초기화 완료');
         } catch (error) {
@@ -655,6 +684,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleEditMode(true, memoDiv);
             });
 
+            // 클릭 이벤트 추가 - 드래그 가능하게 설정
+            viewModeDiv.addEventListener('click', (event) => {
+                // 이미 선택된 텍스트가 있으면 드래그 이벤트 무시 (텍스트 선택 가능하도록)
+                if (window.getSelection().toString()) {
+                    return;
+                }
+
+                // 부모 memoDiv를 드래그 가능하게 만들기
+                memoDiv.draggable = true;
+                memoDiv.style.cursor = 'grab';
+            });
+
+            // 드래그 관련 이벤트 추가
+            memoDiv.addEventListener('dragstart', (event) => {
+                event.dataTransfer.setData('text/plain', memoDiv.dataset.id);
+                event.dataTransfer.effectAllowed = 'move';
+                memoDiv.classList.add('dragging');
+
+                // forEach 대신 for...of 사용
+                for (const item of document.querySelectorAll('.memo-item')) {
+                    if (item !== memoDiv) {
+                        item.classList.add('potential-drop-target');
+                    }
+                }
+            });
+
+            memoDiv.addEventListener('dragend', () => {
+                memoDiv.classList.remove('dragging');
+
+                // forEach 대신 for...of 사용
+                for (const item of document.querySelectorAll('.potential-drop-target')) {
+                    item.classList.remove('potential-drop-target');
+                }
+            });
+
             // 메모 버튼 컨테이너
             const actionsDiv = document.createElement('div');
             actionsDiv.classList.add('memo-actions');
@@ -1075,30 +1139,59 @@ document.addEventListener('DOMContentLoaded', () => {
     // 메모 로드
     async function loadMemosFromStorage() {
         try {
-            memos = await window.electronAPI.getMemos();
+            // 로그인 상태 확인
+            const auth = await window.electronAPI.getAuthStatus();
+            const isLoggedIn = auth?.isLoggedIn;
+
+            if (!isLoggedIn) {
+                console.log('로그인되지 않음: 빈 메모 목록 사용');
+                memos = [];
+                return await renderMemos();
+            }
+
+            // 메모 로드 시도
+            const loadResult = await window.electronAPI.getMemos();
+
+            // 로드 결과가 없거나 오류인 경우 빈 배열 처리
+            if (!loadResult || !Array.isArray(loadResult)) {
+                console.error('잘못된 메모 데이터 형식:', loadResult);
+                memos = [];
+                return await renderMemos();
+            }
+
+            memos = loadResult;
             console.log('메모 로드 완료, 로드된 메모 수:', memos.length);
 
             // 로드된 메모의 카테고리 ID가 제대로 숫자 형태인지 확인
             memos = memos.map(memo => {
-                // 카테고리 ID가 문자열이면 숫자로 변환
-                if (typeof memo.categoryId === 'string' && memo.categoryId !== '') {
-                    const numericId = Number.parseInt(memo.categoryId, 10);
-                    console.log(`메모 ID ${memo.id}의 카테고리ID를 문자열에서 숫자로 변환: ${memo.categoryId} -> ${numericId}`);
-                    memo.categoryId = numericId;
-                }
+                try {
+                    // null 체크 먼저 수행
+                    if (memo.categoryId === null || memo.categoryId === undefined) {
+                        return memo;
+                    }
 
-                // 카테고리 ID가 null이고 categoryId가 '[NULL]'과 같은 문자열이면 null로 확실히 설정
-                if (memo.categoryId === '[NULL]' || memo.categoryId === 'null' || memo.categoryId === '') {
-                    console.log(`메모 ID ${memo.id}의 카테고리ID를 null로 설정: ${memo.categoryId} -> null`);
-                    memo.categoryId = null;
-                }
+                    // 카테고리 ID가 문자열이면 숫자로 변환
+                    if (typeof memo.categoryId === 'string' && memo.categoryId !== '') {
+                        const numericId = Number.parseInt(memo.categoryId, 10);
+                        console.log(`메모 ID ${memo.id}의 카테고리ID를 문자열에서 숫자로 변환: ${memo.categoryId} -> ${numericId}`);
+                        memo.categoryId = numericId;
+                    }
 
+                    // 카테고리 ID가 특수 문자열이면 null로 확실히 설정
+                    if (memo.categoryId === '[NULL]' || memo.categoryId === 'null' || memo.categoryId === '') {
+                        console.log(`메모 ID ${memo.id}의 카테고리ID를 null로 설정: ${memo.categoryId} -> null`);
+                        memo.categoryId = null;
+                    }
+                } catch (memoErr) {
+                    console.error(`메모 처리 중 오류(ID: ${memo?.id || '알 수 없음'}):`, memoErr);
+                    // 오류 발생해도 메모 유지 (최소한의 손상만)
+                }
                 return memo;
             });
 
-            console.log('메모 처리 후 상태 확인:', memos.map(m => ({
+            console.log('메모 처리 후 상태 확인:', memos.slice(0, 3).map(m => ({
                 id: m.id,
-                text: m.text.substring(0, 15),
+                text: m.text && typeof m.text === 'string' ? m.text.substring(0, 15) : '텍스트 없음',
                 categoryId: m.categoryId,
                 categoryType: typeof m.categoryId
             })));
@@ -1108,7 +1201,14 @@ document.addEventListener('DOMContentLoaded', () => {
             memos = [];
         }
 
-        await renderMemos();
+        try {
+            await renderMemos();
+        } catch (renderError) {
+            console.error('메모 렌더링 오류:', renderError);
+            showErrorNotification('메모 표시 중 오류가 발생했습니다.');
+            // 최후의 수단: 메모 컨테이너 비우기
+            memosContainer.innerHTML = '<div class="error-message">메모를 표시할 수 없습니다. 페이지를 새로고침하세요.</div>';
+        }
     }
 
     // 패널 닫기
@@ -1397,6 +1497,94 @@ document.addEventListener('DOMContentLoaded', () => {
         if (searchAndFilter && !document.querySelector('.toggle-container')) {
             searchAndFilter.after(toggleContainer);
         }
+    }
+
+    // 드래그 앤 드롭 설정
+    function setupDragAndDrop() {
+        // 메모 컨테이너에 dragover 이벤트 추가
+        memosContainer.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+
+            const draggingElement = document.querySelector('.dragging');
+            if (!draggingElement) return;
+
+            // 현재 마우스 위치에서 가장 가까운 메모 요소 찾기
+            const afterElement = getDragAfterElement(memosContainer, event.clientY);
+
+            // 드롭 타겟 표시 초기화 - forEach 대신 for...of 사용
+            for (const el of document.querySelectorAll('.drop-target-above, .drop-target-below')) {
+                el.classList.remove('drop-target-above', 'drop-target-below');
+            }
+
+            // 드롭 위치 시각적 표시
+            if (afterElement) {
+                afterElement.classList.add('drop-target-above');
+                memosContainer.insertBefore(draggingElement, afterElement);
+            } else {
+                const lastElement = memosContainer.querySelector('.memo-item:last-child:not(.dragging)');
+                if (lastElement) {
+                    lastElement.classList.add('drop-target-below');
+                }
+                memosContainer.appendChild(draggingElement);
+            }
+        });
+
+        // 메모 컨테이너에 drop 이벤트 추가
+        memosContainer.addEventListener('drop', (event) => {
+            event.preventDefault();
+            const memoId = event.dataTransfer.getData('text/plain');
+            const draggedElement = document.querySelector(`.memo-item[data-id="${memoId}"]`);
+
+            if (draggedElement) {
+                draggedElement.classList.remove('dragging');
+
+                // 드롭 타겟 표시 제거 - forEach 대신 for...of 사용
+                for (const el of document.querySelectorAll('.drop-target-above, .drop-target-below')) {
+                    el.classList.remove('drop-target-above', 'drop-target-below');
+                }
+
+                // 메모 순서 변경 - 배열 재정렬
+                const newMemoOrder = Array.from(memosContainer.querySelectorAll('.memo-item'))
+                    .map(item => Number.parseInt(item.dataset.id, 10));
+
+                // memos 배열 재정렬
+                memos = newMemoOrder.map(id => memos.find(memo => memo.id === id))
+                    .filter(memo => memo !== undefined);
+
+                // 새 순서 저장
+                saveMemosToStorage();
+
+                // 성공 메시지 표시
+                showToast('메모 순서가 변경되었습니다.');
+            }
+        });
+
+        // 메모 컨테이너에 dragleave 이벤트 추가
+        memosContainer.addEventListener('dragleave', (event) => {
+            if (event.target === memosContainer) {
+                for (const el of document.querySelectorAll('.drop-target-above, .drop-target-below')) {
+                    el.classList.remove('drop-target-above', 'drop-target-below');
+                }
+            }
+        });
+    }
+
+    // 드래그 중인 요소를 놓을 위치 결정 (가장 가까운 요소 찾기)
+    function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.memo-item:not(.dragging)')];
+
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+
+            // offset이 음수인데 가장 작은(0에 가까운) 경우가 드롭할 곳
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            }
+            // 불필요한 else 제거
+            return closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 });
 
@@ -1830,8 +2018,25 @@ function handleLoginClick(e) {
 
     console.log('로그인 버튼 클릭');
 
+    // 기존 에러 알림 제거
+    const existingErrors = document.querySelectorAll('.error-notification');
+    for (const el of existingErrors) {
+        if (el.parentNode) {
+            el.parentNode.removeChild(el);
+        }
+    }
+
     // 로그인 창 열기
     window.electronAPI.openLoginWindow();
+}
+
+// 로그인 오류 이벤트 리스너 설정 (초기화 시 호출)
+function setupLoginErrorHandler() {
+    // 로그인 오류 이벤트 리스너 추가
+    window.electronAPI.onLoginError((error) => {
+        console.error('로그인 오류 발생:', error);
+        showErrorNotification(`로그인 오류: ${error}`);
+    });
 }
 
 // 컴팩트 모드 토글 함수

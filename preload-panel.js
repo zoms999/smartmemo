@@ -121,7 +121,10 @@ const electronAPI = {
         console.log('openLoginWindow 함수 직접 호출됨');
         ipcRenderer.send('open-login-window');
         console.log('open-login-window 이벤트 전송 완료');
-    }
+    },
+
+    // 로그인 오류 이벤트 수신
+    onLoginError: createLoggedReceiver('login-error')
 };
 
 // API 노출

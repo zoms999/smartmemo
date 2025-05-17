@@ -66,8 +66,76 @@ async function createSchema() {
     const client = await pool.connect();
 
     try {
-      await client.query(sql);
-      console.log('데이터베이스 스키마 생성 완료');
+      console.log('스키마 생성 시작...');
+
+      // 오류가 발생해도 계속 진행하도록 트랜잭션 사용
+      await client.query('BEGIN');
+
+      try {
+        // SQL 문을 여러 명령으로 분리하여 실행
+        const commands = sql.split(';').filter(cmd => cmd.trim() !== '');
+
+        for (const command of commands) {
+          try {
+            await client.query(command);
+          } catch (cmdError) {
+            console.warn(`명령 실행 중 오류 (계속 진행): ${cmdError.message}`);
+            console.warn(`문제된 명령: ${command.trim().substring(0, 100)}...`);
+          }
+        }
+
+        await client.query('COMMIT');
+        console.log('데이터베이스 스키마 생성 완료');
+      } catch (sqlError) {
+        await client.query('ROLLBACK');
+        console.error('스키마 생성 중 오류 발생, 롤백됨:', sqlError.message);
+        throw sqlError;
+      }
+
+      // 카테고리 테이블 확인 및 초기 데이터 삽입 재시도
+      try {
+        const checkCategoriesResult = await client.query("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'categories')");
+
+        if (checkCategoriesResult.rows[0].exists) {
+          console.log('카테고리 테이블 존재 확인됨');
+
+          // 카테고리 테이블 데이터 확인
+          const categoryCount = await client.query('SELECT COUNT(*) FROM categories');
+
+          if (parseInt(categoryCount.rows[0].count) === 0) {
+            console.log('카테고리 테이블에 초기 데이터 삽입 시도...');
+            await client.query(`
+              INSERT INTO categories (id, name, color)
+              VALUES
+                (1, '업무', '#4a6da7'),
+                (2, '개인', '#8bc34a'),
+                (3, '아이디어', '#ff9800'),
+                (4, '할일', '#9c27b0')
+              ON CONFLICT (id) DO NOTHING
+            `);
+          }
+        } else {
+          console.warn('카테고리 테이블이 없습니다! 테이블 생성 시도...');
+          await client.query(`
+            CREATE TABLE IF NOT EXISTS categories (
+              id SERIAL PRIMARY KEY,
+              name TEXT NOT NULL,
+              color TEXT NOT NULL
+            );
+
+            INSERT INTO categories (id, name, color)
+            VALUES
+              (1, '업무', '#4a6da7'),
+              (2, '개인', '#8bc34a'),
+              (3, '아이디어', '#ff9800'),
+              (4, '할일', '#9c27b0')
+            ON CONFLICT (id) DO NOTHING
+          `);
+        }
+      } catch (tableFixError) {
+        console.error('카테고리 테이블 수정 중 오류:', tableFixError.message);
+      }
+
       return true;
     } finally {
       client.release();
@@ -370,6 +438,8 @@ async function signOut() {
 
 // 모듈 내보내기
 module.exports = {
+  supabase,
+  pool,
   testConnection,
   createSchema,
   saveMemoToDb,
@@ -381,6 +451,5 @@ module.exports = {
   getTagsFromDb,
   signInWithGoogle,
   getCurrentUser,
-  signOut,
-  supabase  // supabase 객체 직접 노출
+  signOut
 };

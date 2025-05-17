@@ -48,11 +48,30 @@ function logError(...args) {
 let db;
 try {
   db = require('./supabase');
+  // 추가 검증: Supabase 객체가 실제로 존재하는지 확인
+  if (!db || !db.supabase) {
+    throw new Error('Supabase 객체가 초기화되지 않았습니다.');
+  }
   log('Supabase 모듈 로드 성공');
+
+  // 연결 테스트 시도
+  setTimeout(async () => {
+    try {
+      const testResult = await db.testConnection();
+      if (testResult) {
+        log('Supabase 연결 테스트 성공');
+      } else {
+        logError('Supabase 연결 테스트 실패');
+      }
+    } catch (testError) {
+      logError('Supabase 연결 테스트 오류:', testError);
+    }
+  }, 500);
 } catch (error) {
   logError('Supabase 모듈 로드 실패:', error);
   // 기본 더미 객체 생성 (오류 방지용)
   db = {
+    supabase: null, // supabase 클라이언트 참조 추가
     testConnection: async () => ({ success: false, error: '모듈 로드 실패' }),
     createSchema: async () => false,
     getMemosFromDb: async () => ({ success: false, memos: [], error: '데이터베이스 연결 실패' }),
@@ -63,6 +82,15 @@ try {
     signOut: async () => ({ success: false, error: '데이터베이스 연결 실패' }),
     getCurrentUser: async () => ({ success: false, user: null, error: '데이터베이스 연결 실패' })
   };
+
+  // 데이터베이스 연결 실패 알림 표시 (애플리케이션 시작 후)
+  if (app.isReady()) {
+    dialog.showErrorBox('데이터베이스 연결 실패', '애플리케이션이 Supabase 데이터베이스에 연결할 수 없습니다. 오프라인 모드로 작동합니다.');
+  } else {
+    app.once('ready', () => {
+      dialog.showErrorBox('데이터베이스 연결 실패', '애플리케이션이 Supabase 데이터베이스에 연결할 수 없습니다. 오프라인 모드로 작동합니다.');
+    });
+  }
 }
 
 // 애플리케이션 스키마 정의 및 기본값 설정
@@ -959,7 +987,7 @@ async function initializeApp() {
     // Auth IPC 핸들러 설정 (한 번만 호출)
     setupAuthIpcHandlers();
 
-    // 데이터베이스 연결 테스트
+    // 데이터베이스 연결 테스트 및 초기화
     try {
         const isConnected = await db.testConnection();
         // UTF-8로 출력하기 위한 Buffer 사용 (한글 깨짐 방지)
@@ -968,13 +996,77 @@ async function initializeApp() {
 
         if (isConnected) {
             // 연결 성공 시 스키마 생성 시도
+            console.log('데이터베이스 스키마 초기화 시작...');
+
+            // 먼저 카테고리 테이블 상태 확인
+            try {
+                // PostgreSQL 직접 연결로 테이블 체크
+                const client = await db.pool.connect();
+                try {
+                    // 카테고리 테이블 존재 여부 확인
+                    const tableCheck = await client.query(
+                        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'categories')"
+                    );
+
+                    const tableExists = tableCheck.rows[0].exists;
+                    console.log(`카테고리 테이블 존재 여부: ${tableExists}`);
+
+                    // 테이블이 존재하면 데이터 확인
+                    if (tableExists) {
+                        const dataCheck = await client.query('SELECT COUNT(*) FROM categories');
+                        const count = parseInt(dataCheck.rows[0].count);
+                        console.log(`카테고리 테이블 데이터 수: ${count}`);
+
+                        // 데이터가 없으면 초기 데이터 삽입
+                        if (count === 0) {
+                            console.log('카테고리 초기 데이터 삽입 시도...');
+                            await client.query(`
+                                INSERT INTO categories (id, name, color)
+                                VALUES
+                                    (1, '업무', '#4a6da7'),
+                                    (2, '개인', '#8bc34a'),
+                                    (3, '아이디어', '#ff9800'),
+                                    (4, '할일', '#9c27b0')
+                                ON CONFLICT (id) DO NOTHING
+                            `);
+                        }
+                    } else {
+                        // 테이블이 없으면 스키마 생성 시도
+                        console.log('카테고리 테이블이 없습니다. 전체 스키마 생성 시도...');
+                    }
+                } finally {
+                    client.release();
+                }
+            } catch (tableCheckError) {
+                console.error('테이블 상태 확인 오류:', tableCheckError);
+            }
+
+            // 전체 스키마 생성 시도
             const schemaCreated = await db.createSchema();
             const schemaMsg = Buffer.from(`스키마 생성 상태: ${schemaCreated ? '성공' : '이미 존재하거나 실패'}`, 'utf8').toString();
             console.log(schemaMsg);
+        } else {
+            // 연결 실패 시 메시지 출력
+            console.error('데이터베이스 연결에 실패했습니다. 오프라인 모드로 작동합니다.');
+
+            // 사용자에게 알림
+            dialog.showMessageBox({
+                type: 'warning',
+                title: '데이터베이스 연결 오류',
+                message: '데이터베이스 연결에 실패했습니다.',
+                detail: '앱이 오프라인 모드로 작동합니다. 일부 기능이 제한될 수 있습니다.',
+                buttons: ['확인']
+            });
         }
     } catch (error) {
         const errorMsg = Buffer.from(`데이터베이스 연결/설정 오류: ${error}`, 'utf8').toString();
         console.error(errorMsg);
+
+        // 오류 대화상자 표시
+        dialog.showErrorBox(
+            '데이터베이스 초기화 오류',
+            '데이터베이스 연결 또는 설정 중 오류가 발생했습니다. 오프라인 모드로 작동합니다.'
+        );
     }
 
     // 트레이 아이콘 생성
@@ -1648,10 +1740,19 @@ async function handleOAuthCallback(callbackUrl) { // async 키워드 추가
     console.log("메인 프로세스: 최종 액세스 토큰 존재:", !!accessToken);
     console.log("메인 프로세스: 최종 리프레시 토큰 존재:", !!refreshToken);
 
-    if (accessToken && db.supabase) {
-      console.log("메인 프로세스: Supabase 세션 설정 시도...");
-      console.log("메인 프로세스: db.supabase 객체 존재:", !!db.supabase);
-      console.log("메인 프로세스: db.supabase.auth 객체 존재:", !!db.supabase.auth);
+            // 5. 액세스 토큰 유효성 검증
+        if (!accessToken) {
+          console.error("메인 프로세스: 액세스 토큰이 없습니다.");
+          if (loginWindow && !loginWindow.isDestroyed()) {
+            loginWindow.webContents.send('login-error', '로그인 처리 중 오류: 인증 토큰을 가져올 수 없습니다.');
+          }
+          throw new Error("액세스 토큰이 없습니다.");
+        }
+
+        if (accessToken && db.supabase) {
+          console.log("메인 프로세스: Supabase 세션 설정 시도...");
+          console.log("메인 프로세스: db.supabase 객체 존재:", !!db.supabase);
+          console.log("메인 프로세스: db.supabase.auth 객체 존재:", !!db.supabase.auth);
 
       try {
         // Supabase 세션 설정을 기다림
