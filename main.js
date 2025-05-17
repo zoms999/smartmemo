@@ -1425,7 +1425,7 @@ function createLoginWindow() {
 
 // 로그인 상태 확인
 async function checkLoginStatus() {
-  const auth = store.get('auth');
+  const auth = store.get('auth', { isLoggedIn: false, user: null, skipLogin: false, refreshToken: null });
   console.log('메인 프로세스: 로그인 상태 확인 중');
 
   // 로그인 건너뛰기 상태 확인
@@ -1442,8 +1442,21 @@ async function checkLoginStatus() {
       // 세션 갱신 시도
       const result = await db.getCurrentUser();
 
+      // 사용자 정보 및 세션이 유효한 경우
       if (result.success && result.user) {
         console.log('메인 프로세스: 세션 갱신 성공, 사용자:', result.user.email);
+
+        // 세션 정보 업데이트 (필요한 경우)
+        if (result.session && result.session.refresh_token) {
+          console.log('메인 프로세스: 갱신된 세션 정보로 저장소 업데이트');
+          store.set('auth', {
+            user: result.user,
+            isLoggedIn: true,
+            skipLogin: false,
+            refreshToken: result.session.refresh_token
+          });
+        }
+
         return true;
       } else {
         console.log('메인 프로세스: 세션 만료됨, 재인증 필요');
@@ -1458,7 +1471,7 @@ async function checkLoginStatus() {
               refresh_token: auth.refreshToken
             });
 
-            if (data && data.user && !error) {
+            if (data && data.user && data.session && !error) {
               console.log('메인 프로세스: 리프레시 토큰으로 세션 복구 성공');
 
               // 새 세션 정보 저장
@@ -1466,7 +1479,7 @@ async function checkLoginStatus() {
                 user: data.user,
                 isLoggedIn: true,
                 skipLogin: false,
-                refreshToken: refreshToken || null
+                refreshToken: data.session.refresh_token
               });
 
               return true;
@@ -1479,11 +1492,13 @@ async function checkLoginStatus() {
         }
 
         // 모든 복구 시도가 실패하면 로그인 정보 초기화
+        console.log('메인 프로세스: 로그인 정보 초기화');
         store.set('auth', { isLoggedIn: false, user: null, skipLogin: false, refreshToken: null });
         return false;
       }
     } catch (error) {
       console.error('메인 프로세스: 세션 확인 중 오류 발생:', error);
+      console.log('메인 프로세스: 로그인 정보 초기화');
       store.set('auth', { isLoggedIn: false, user: null, skipLogin: false, refreshToken: null });
       return false;
     }
@@ -1632,7 +1647,7 @@ async function handleOAuthCallback(callbackUrl) { // async 키워드 추가
             user: data?.user || null,
             isLoggedIn: true,
             skipLogin: false,
-            refreshToken: refreshToken || null
+            refreshToken: data?.session?.refresh_token || refreshToken || null
           });
           console.log("메인 프로세스: 로그인 상태 저장 완료");
 

@@ -292,9 +292,40 @@ async function signInWithGoogle() {
 // 현재 로그인 상태 확인
 async function getCurrentUser() {
   try {
+    // 1단계: 현재 세션 확인
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+    // 세션 오류 처리
+    if (sessionError) {
+      console.error('세션 확인 오류:', sessionError.message);
+      throw sessionError;
+    }
+
+    // 세션이 없으면 로그인 안 됨
+    if (!sessionData || !sessionData.session) {
+      console.log('유효한 세션 없음, 재인증 필요');
+      return { success: false, error: '세션이 없거나 만료됨' };
+    }
+
+    // 2단계: 유효한 세션이 있으면 사용자 정보 가져오기
     const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    return { success: true, user: data.user };
+
+    if (error) {
+      console.error('사용자 정보 가져오기 오류:', error.message);
+      throw error;
+    }
+
+    if (!data || !data.user) {
+      console.log('사용자 정보 없음');
+      return { success: false, error: '사용자 정보가 없음' };
+    }
+
+    console.log('현재 로그인된 사용자:', data.user.email);
+    return {
+      success: true,
+      user: data.user,
+      session: sessionData.session
+    };
   } catch (error) {
     console.error('사용자 정보 가져오기 오류:', error.message);
     return { success: false, error: error.message };

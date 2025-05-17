@@ -75,6 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // 로그인 버튼 상태 업데이트
             updateAuthButtonState(isLoggedIn, auth?.user);
 
+            // 로그인 버튼에 추가 이벤트 리스너 설정
+            setupAuthButton();
+
             // 카테고리 로드
             categories = await window.electronAPI.getCategories();
 
@@ -110,20 +113,43 @@ document.addEventListener('DOMContentLoaded', () => {
         // 아이콘 변경 및 클래스 추가
         if (isLoggedIn && user) {
             loginButton.classList.add('logged-in');
+            loginButton.dataset.action = 'logout';
             loginButton.title = `로그아웃 (${user.email})`;
 
-            // 사용자 정보 표시
-            const authInfo = document.createElement('span');
-            authInfo.classList.add('auth-info');
-            authInfo.textContent = user.email;
+            // SVG 아이콘 변경 - 로그인 상태용 아이콘(녹색)
+            loginButton.innerHTML = `
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="#2ecc71" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path>
+                </svg>
+            `;
 
-            const headerActions = document.querySelector('.header-actions');
-            if (headerActions && !document.querySelector('.auth-info')) {
-                headerActions.insertBefore(authInfo, loginButton);
+            // 사용자 정보 표시
+            const existingAuthInfo = document.querySelector('.auth-info');
+            if (existingAuthInfo) {
+                existingAuthInfo.textContent = user.email.split('@')[0]; // 사용자 이름만 표시
+                existingAuthInfo.title = user.email; // 전체 이메일은 툴팁에 표시
+            } else {
+                const authInfo = document.createElement('span');
+                authInfo.classList.add('auth-info');
+                authInfo.textContent = user.email.split('@')[0]; // 사용자 이름만 표시
+                authInfo.title = user.email; // 전체 이메일은 툴팁에 표시
+
+                const headerActions = document.querySelector('.header-actions');
+                if (headerActions) {
+                    headerActions.insertBefore(authInfo, loginButton);
+                }
             }
         } else {
             loginButton.classList.remove('logged-in');
+            loginButton.dataset.action = 'login';
             loginButton.title = '로그인';
+
+            // SVG 아이콘 변경 - 로그아웃 상태용 아이콘(기본색)
+            loginButton.innerHTML = `
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path>
+                </svg>
+            `;
 
             // 사용자 정보 제거
             const authInfo = document.querySelector('.auth-info');
@@ -131,6 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 authInfo.remove();
             }
         }
+
+        console.log(`로그인 버튼 상태 업데이트: ${isLoggedIn ? '로그인됨' : '로그아웃됨'}`);
     }
 
     // 로그인 필요 메시지 표시
@@ -180,101 +208,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 로그인/로그아웃 처리
-    async function handleAuthAction(event) {
-        console.log('handleAuthAction 함수 호출됨', event);
-
-        try {
-            // 이벤트가 있으면 기본 동작 방지
-            if (event && event.preventDefault) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-
-            // 로그인 버튼 클릭 시 로그인 페이지 열기
-            console.log('로그인 페이지 열기 시도');
-            window.electronAPI.openLoginWindow();
-            console.log('openLoginWindow 호출 완료');
-
-        } catch (error) {
-            console.error('인증 처리 오류:', error);
-            showErrorNotification('인증 처리 중 오류가 발생했습니다: ' + error.message);
-        }
-    }
-
-    // 로그인 버튼 핸들러 - 직접 함수 정의
-    function handleLoginClick(e) {
-        console.log('로그인 버튼 클릭됨! 이벤트 객체:', e);
-        e.preventDefault();
-        e.stopPropagation();
-
-        try {
-            console.log('로그인 창 열기 시도 - window.electronAPI 존재여부:', !!window.electronAPI);
-            console.log('window.electronAPI 메서드들:', Object.keys(window.electronAPI).join(', '));
-
-            // 실제 IPC 호출
-            window.electronAPI.openLoginWindow();
-            console.log('openLoginWindow 메서드 호출 완료');
-        } catch (error) {
-            console.error('로그인 버튼 클릭 처리 중 오류 발생:', error);
-            alert('로그인 처리 중 오류가 발생했습니다: ' + error.message);
-        }
-    }
-
-    // 별도 초기화 함수를 통해 로그인 버튼 설정
-    function setupAuthButton() {
-        console.log('로그인 버튼 설정 함수 실행');
-
-        // 최신 참조 획득
-        const loginButton = document.getElementById('auth-button');
-        console.log('setupAuthButton에서 버튼 찾기:', loginButton ? '성공' : '실패');
-
-        if (!loginButton) {
-            console.error('로그인 버튼을 찾을 수 없습니다!');
-            // DOM에 직접 추가 시도
-            const headerActions = document.querySelector('.header-actions');
-            if (headerActions) {
-                console.log('헤더 액션 영역 발견, 버튼 직접 추가 시도');
-                const newButton = document.createElement('button');
-                newButton.id = 'auth-button';
-                newButton.className = 'icon-btn login-button';
-                newButton.title = '로그인/로그아웃';
-                newButton.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18">
-                    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path>
-                </svg>`;
-
-                // 이벤트 리스너 추가
-                newButton.addEventListener('click', handleLoginClick);
-
-                // DOM에 추가
-                headerActions.insertBefore(newButton, headerActions.firstChild);
-                console.log('로그인 버튼 동적 생성 완료');
-            }
-            return;
-        }
-
-        // 이벤트 리스너 제거 후 다시 추가
-        loginButton.removeEventListener('click', handleLoginClick);
-
-        // 여러 방법으로 이벤트 리스너 등록
-        loginButton.addEventListener('click', handleLoginClick);
-
-        // 스타일 변경으로 버튼 강조
-        loginButton.style.cursor = 'pointer';
-        loginButton.style.position = 'relative';
-        loginButton.style.zIndex = '1000';
-
-        console.log('로그인 버튼 이벤트 리스너 설정 완료');
-
-        // 테스트용 딜레이 후 클릭 강제 실행
-        setTimeout(() => {
-            console.log('5초 후 로그인 버튼 상태 확인:', document.getElementById('auth-button') ? '존재함' : '없음');
-        }, 5000);
-    }
-
     // 이벤트 리스너 설정
     function setupEventListeners() {
         console.log('setupEventListeners 함수 시작');
+
+        // 로그인 버튼 이벤트 리스너 연결
+        const authButton = document.getElementById('auth-button');
+        if (authButton) {
+            console.log('로그인 버튼 이벤트 리스너 추가');
+
+            // 클릭 이벤트 대신 마우스 오버 이벤트로 변경
+            authButton.addEventListener('mouseenter', async (e) => {
+                // 현재 로그인 상태 확인
+                const auth = await window.electronAPI.getAuthStatus();
+                const isLoggedIn = auth && auth.isLoggedIn;
+
+                // 로그인된 상태일 때만 드롭다운 메뉴 표시
+                if (isLoggedIn) {
+                    showAuthDropdown();
+                } else {
+                    // 로그인되지 않은 상태에서는 클릭 시 로그인 창 열기
+                    authButton.addEventListener('click', handleLoginClick);
+                }
+            });
+        } else {
+            console.error('로그인 버튼을 찾을 수 없습니다!');
+        }
 
         // 패널 관련 이벤트
         const closeBtn = document.getElementById('close-btn');
@@ -331,9 +290,6 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsBtn.addEventListener('click', () => {
             window.electronAPI.openSettingsWindow();
         });
-
-        // 로그인 버튼 설정 별도 함수 호출
-        setupAuthButton();
 
         // 위젯에서 메모 업데이트 이벤트
         window.electronAPI.onMemoUpdateFromWidget(async (data) => {
@@ -1140,4 +1096,166 @@ function showErrorNotification(message) {
             }, 300);
         }
     }, 10000);
+}
+
+// 로그아웃 드롭다운 메뉴 표시
+function showAuthDropdown() {
+    let dropdown = document.getElementById('auth-dropdown');
+
+    // 이미 드롭다운이 있으면 반환
+    if (dropdown) return;
+
+    // 드롭다운 메뉴 생성
+    dropdown = document.createElement('div');
+    dropdown.id = 'auth-dropdown';
+    dropdown.className = 'auth-dropdown';
+
+    // 로그아웃 옵션 추가
+    const logoutOption = document.createElement('div');
+    logoutOption.className = 'dropdown-option';
+    logoutOption.id = 'logout-option';
+    logoutOption.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"></path>
+        </svg>
+        <span>로그아웃</span>
+    `;
+
+    logoutOption.addEventListener('click', handleLogout);
+    dropdown.appendChild(logoutOption);
+
+    // 드롭다운 메뉴 위치 조정 및 추가
+    const authButton = document.getElementById('auth-button');
+    if (authButton) {
+        const rect = authButton.getBoundingClientRect();
+        dropdown.style.top = `${rect.bottom + 5}px`;
+        dropdown.style.right = '20px';
+
+        document.body.appendChild(dropdown);
+
+        // 명시적으로 보이게 설정
+        dropdown.style.display = 'block';
+
+        console.log('로그아웃 드롭다운 메뉴가 생성되었습니다.');
+
+        // 드롭다운과 버튼에 마우스 이벤트 추가
+        dropdown.addEventListener('mouseleave', hideAuthDropdown);
+
+        // 드롭다운 메뉴에 마우스가 들어왔을 때 이벤트 처리
+        dropdown.addEventListener('mouseenter', () => {
+            const existingDropdown = document.getElementById('auth-dropdown');
+            if (existingDropdown) {
+                clearTimeout(window.dropdownTimeout);
+            }
+        });
+    }
+}
+
+// 로그아웃 드롭다운 메뉴 숨기기
+function hideAuthDropdown() {
+    // 타임아웃 설정하여 즉시 제거하지 않고 약간의 지연 후 제거
+    window.dropdownTimeout = setTimeout(() => {
+        const dropdown = document.getElementById('auth-dropdown');
+        if (dropdown) {
+            dropdown.remove();
+        }
+    }, 300); // 300ms 지연
+}
+
+// 로그인 버튼을 위한 이벤트 추가
+function setupAuthButton() {
+    const authButton = document.getElementById('auth-button');
+    if (authButton) {
+        // 마우스가 로그인 버튼을 떠날 때 이벤트 처리
+        authButton.addEventListener('mouseleave', () => {
+            window.dropdownTimeout = setTimeout(() => {
+                const dropdown = document.getElementById('auth-dropdown');
+                if (dropdown && !dropdown.matches(':hover')) {
+                    dropdown.remove();
+                }
+            }, 300); // 300ms 지연
+        });
+
+        // 로그인 상태 확인 후 클릭 이벤트 다시 설정
+        window.electronAPI.getAuthStatus().then(auth => {
+            const isLoggedIn = auth && auth.isLoggedIn;
+            if (!isLoggedIn) {
+                authButton.addEventListener('click', handleLoginClick);
+            }
+        });
+    }
+}
+
+// 로그인/로그아웃 처리
+async function handleAuthAction(event) {
+    console.log('handleAuthAction 함수 호출됨', event);
+
+    try {
+        // 이벤트가 있으면 기본 동작 방지
+        if (event && event.preventDefault) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+
+        // 현재 로그인 상태 확인
+        const auth = await window.electronAPI.getAuthStatus();
+        const isLoggedIn = auth && auth.isLoggedIn;
+
+        if (isLoggedIn) {
+            // 로그인 상태라면 아무 작업 안함 (마우스 오버가 처리)
+            return;
+        } else {
+            // 로그인 상태가 아니라면 로그인 페이지 열기
+            console.log('로그인 페이지 열기 시도');
+            window.electronAPI.openLoginWindow();
+            console.log('openLoginWindow 호출 완료');
+        }
+    } catch (error) {
+        console.error('인증 처리 오류:', error);
+    }
+}
+
+// 로그아웃 처리
+async function handleLogout() {
+    try {
+        const result = await window.electronAPI.signOut();
+
+        if (result.success) {
+            console.log('로그아웃 성공');
+            // 로그아웃 성공 시 UI 업데이트
+            updateAuthButtonState(false, null);
+
+            // 메모 목록 초기화
+            memos = [];
+            renderMemos();
+
+            // 로그인 프롬프트 표시
+            showLoginPrompt();
+
+            // 드롭다운 메뉴 제거
+            const dropdown = document.getElementById('auth-dropdown');
+            if (dropdown) {
+                dropdown.remove();
+            }
+        } else {
+            console.error('로그아웃 실패:', result.error);
+            showErrorNotification('로그아웃 중 오류가 발생했습니다.');
+        }
+    } catch (error) {
+        console.error('로그아웃 처리 오류:', error);
+        showErrorNotification('로그아웃 중 오류가 발생했습니다.');
+    }
+}
+
+// 로그인 버튼 클릭 처리
+function handleLoginClick(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    console.log('로그인 버튼 클릭');
+
+    // 로그인 창 열기
+    window.electronAPI.openLoginWindow();
 }

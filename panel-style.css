@@ -154,7 +154,10 @@ input[type="text"] {
 
 .header-actions {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: nowrap;
+    margin-left: auto;
 }
 
 .icon-btn {
@@ -949,13 +952,35 @@ input[type="text"] {
 }
 
 .auth-info {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-secondary);
-    margin-right: 10px;
-    max-width: 120px;
+    margin-right: 5px;
+    max-width: 80px; /* 더 좁은 너비로 제한 */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    opacity: 0.8;
+}
+
+/* 로그인 상태 요약 툴팁 추가 */
+.auth-info:hover {
+    position: relative;
+}
+
+.auth-info:hover::after {
+    content: attr(title);
+    position: absolute;
+    top: 20px;
+    right: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    white-space: nowrap;
+    z-index: 1000;
+    box-shadow: 0 2px 5px var(--shadow-color);
 }
 
 /* 로그인 프롬프트 스타일 */
@@ -995,4 +1020,73 @@ input[type="text"] {
 .login-prompt-content .primary-btn {
     margin-top: 10px;
     padding: 10px 20px;
+}
+
+/* 로그아웃 드롭다운 메뉴 스타일 */
+.auth-dropdown {
+    position: fixed;
+    background-color: var(--bg-color);
+    border: 2px solid var(--primary-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    min-width: 180px;
+    z-index: 9999;
+    overflow: hidden;
+    animation: fadeIn 0.2s ease-out;
+    transform-origin: top right;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.dropdown-option {
+    padding: 12px 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s ease;
+}
+
+.dropdown-option:hover {
+    background-color: rgba(52, 152, 219, 0.15);
+    transform: translateX(3px);
+}
+
+.dropdown-option svg {
+    color: var(--text-secondary);
+    width: 20px;
+    height: 20px;
+    transition: transform 0.2s ease;
+}
+
+.dropdown-option:hover svg {
+    transform: scale(1.1);
+}
+
+.dropdown-option span {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* 로그아웃 옵션 특별 스타일 */
+.dropdown-option:first-child {
+    color: #e74c3c;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.dropdown-option:first-child svg {
+    color: #e74c3c;
+}
+
+.dropdown-option:first-child:hover {
+    background-color: rgba(231, 76, 60, 0.1);
 }
