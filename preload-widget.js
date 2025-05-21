@@ -15,5 +15,10 @@ contextBridge.exposeInMainWorld('electronWidgetAPI', {
     onInitializeWidget: (callback) => ipcRenderer.on('initialize-widget', (event, memo) => callback(memo)),
     updateContent: (memoId, newContent) => ipcRenderer.invoke('update-memo-content-from-widget', { memoId, newContent }),
     returnToPanel: (memoId) => ipcRenderer.send('return-widget-to-panel', memoId),
-    closeWidget: (memoId) => ipcRenderer.send('return-widget-to-panel', memoId) // 닫기도 패널로 복귀와 동일하게 처리
+    closeWidget: (memoId) => ipcRenderer.send('return-widget-to-panel', memoId), // 닫기도 패널로 복귀와 동일하게 처리
+
+    // 추가된 메서드들
+    updateWidgetStatus: (memoId, isWidget) => ipcRenderer.invoke('update-widget-status', { memoId, isWidget }),
+    notifyPanelToShowMemo: (memoId) => ipcRenderer.send('force-show-memo', memoId),
+    refreshPanel: () => ipcRenderer.send('refresh-panel')
 });

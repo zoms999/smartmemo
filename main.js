@@ -821,6 +821,43 @@ function setupPanelIpcHandlers() {
       return text;
     }
   });
+
+  // 위젯 상태 업데이트 핸들러 추가
+  safelyRegisterHandler('update-widget-status', async (event, { memoId, isWidget }) => {
+    console.log(`[메인 프로세스] 메모 ID ${memoId}의 위젯 상태를 ${isWidget}로 업데이트`);
+
+    try {
+      // DB에 상태 변경 적용
+      if (db && db.supabase) {
+        const { data, error } = await db.supabase
+          .from('memos')
+          .update({ is_widget: isWidget })
+          .eq('id', memoId);
+
+        if (error) {
+          console.error('[메인 프로세스] 위젯 상태 DB 업데이트 오류:', error);
+        } else {
+          console.log('[메인 프로세스] 위젯 상태 DB 업데이트 성공');
+        }
+      }
+
+      // 로컬 저장소에도 상태 변경 적용
+      const memos = store.get('memos', []);
+      const updatedMemos = memos.map(memo => {
+        if (memo.id === memoId) {
+          console.log(`[메인 프로세스] 로컬 저장소에서 메모 ID ${memoId}의 isWidget 속성을 ${isWidget}로 업데이트`);
+          return { ...memo, isWidget };
+        }
+        return memo;
+      });
+      store.set('memos', updatedMemos);
+
+      return { success: true };
+    } catch (error) {
+      console.error('[메인 프로세스] 위젯 상태 업데이트 오류:', error);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 // === 새 위젯 창 생성 함수 ===
@@ -1350,12 +1387,84 @@ ipcMain.handle('update-memo-content-from-widget', async (event, { memoId, newCon
 });
 
 // 위젯 창에서 "패널로 되돌리기" 또는 닫기 시 호출
-ipcMain.on('return-widget-to-panel', (event, memoId) => {
-    const widgetWin = activeWidgetWindows.get(memoId);
-    if (widgetWin) {
-        widgetWin.close(); // closed 이벤트에서 activeWidgetWindows.delete 및 패널 알림 처리
+ipcMain.on('return-widget-to-panel', async (event, memoId) => {
+    console.log(`패널로 되돌리기 요청 수신: memoId=${memoId}, 타입=${typeof memoId}`);
+
+    // 메모 ID가 문자열이면 숫자로 변환 (일관성 유지)
+    const numericId = typeof memoId === 'string' ? Number.parseInt(memoId, 10) : memoId;
+
+    // 이 메모가 최근에 패널로 돌아온 메모임을 전역 변수에 저장
+    global.lastRestoredMemoId = numericId;
+
+    try {
+        // 1. 먼저 메모의 위젯 상태를 직접 업데이트
+        if (db && db.supabase) {
+            try {
+                console.log(`메모 ID ${numericId}의 위젯 상태를 false로 직접 업데이트`);
+                const { data, error } = await db.supabase
+                    .from('memos')
+                    .update({ is_widget: false })
+                    .eq('id', numericId);
+
+                if (error) {
+                    console.error('위젯 상태 업데이트 DB 오류:', error);
+                } else {
+                    console.log('DB에서 위젯 상태 업데이트 성공');
+                }
+            } catch (dbError) {
+                console.error('DB 작업 중 오류:', dbError);
+            }
+        }
+
+        // 2. 로컬 메모 데이터 업데이트
+        const memos = store.get('memos', []);
+        const updatedMemos = memos.map(memo => {
+            if (memo.id === numericId) {
+                console.log(`로컬 저장소에서 메모 ID ${numericId}의 isWidget 속성을 false로 업데이트`);
+                // 강제 노출 플래그 추가
+                return { ...memo, isWidget: false, recentlyRestored: true, forceVisible: true };
+            }
+            return memo;
+        });
+        store.set('memos', updatedMemos);
+
+        // 3. 패널이 있으면 패널에 알림
+        if (panelWindow && !panelWindow.isDestroyed()) {
+            console.log(`패널에 위젯 닫힘 알림 전송 (ID: ${numericId})`);
+
+            // 패널에 강제 노출 알림 전송
+            panelWindow.webContents.send('force-show-memo', numericId);
+
+            // 여러 이벤트를 시간차를 두고 전송하여 패널이 확실히 처리하도록 함
+            panelWindow.webContents.send('update-widget-status', { memoId: numericId, isWidget: false });
+
+            setTimeout(() => {
+                panelWindow.webContents.send('widget-closed', numericId);
+                console.log(`지연 후 widget-closed 메시지 전송됨 (ID: ${numericId})`);
+            }, 200);
+
+            setTimeout(() => {
+                panelWindow.webContents.send('show-panel-and-focus-memo', numericId);
+                console.log(`지연 후 focus-memo 메시지 전송됨 (ID: ${numericId})`);
+
+                // 패널 내 모든 필터 초기화 요청
+                panelWindow.webContents.send('reset-all-filters');
+            }, 400);
+        }
+
+        // 4. 위젯 창이 있으면 닫기
+        const widgetWin = activeWidgetWindows.get(numericId);
+        if (widgetWin && !widgetWin.isDestroyed()) {
+            console.log(`위젯 창 찾음, 닫기 시작 (ID: ${numericId})`);
+            widgetWin.close(); // closed 이벤트에서 activeWidgetWindows.delete 처리
+        } else {
+            console.error(`위젯 창을 찾을 수 없음 (ID: ${numericId})`);
+            // 위젯 창을 찾지 못했어도 맵에서 제거
+            activeWidgetWindows.delete(numericId);
+        }
+    } catch (error) {
+        console.error(`위젯 처리 중 오류 발생 (ID: ${numericId}):`, error);
     }
-    // 패널 렌더러는 widget-closed 이벤트를 수신하여 isWidget 상태를 false로 변경
 });
 
 // 외부 링크 열기 요청 처리
@@ -2443,3 +2552,33 @@ function enhanceProtocolRegistration() {
 // 아이콘 경로 상수 정의
 const appIconPath = path.join(__dirname, 'assets', 'icon.png');
 const tryIconPath = path.join(__dirname, 'assets', 'try_icon.png');
+
+// 패널 새로고침 요청 처리
+ipcMain.on('refresh-panel', (event) => {
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    console.log('[메인 프로세스] 패널 새로고침 요청 수신');
+
+    // 모든 필터 초기화 요청
+    panelWindow.webContents.send('reset-all-filters');
+
+    // 위젯 상태인 메모 목록을 갱신하도록 요청
+    panelWindow.webContents.send('refresh-memos');
+
+    // 마지막으로 복원된 메모가 있다면 해당 메모로 포커스 요청
+    if (global.lastRestoredMemoId) {
+      console.log(`[메인 프로세스] 마지막으로 복원된 메모(ID: ${global.lastRestoredMemoId})로 포커스 요청`);
+      panelWindow.webContents.send('show-panel-and-focus-memo', global.lastRestoredMemoId);
+
+      // 처리 후 변수 초기화
+      global.lastRestoredMemoId = null;
+    }
+  }
+});
+
+// 위젯 메모를 강제로 표시 요청
+ipcMain.on('force-show-memo', (event, memoId) => {
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    console.log(`[메인 프로세스] 메모 ID ${memoId} 강제 표시 요청`);
+    panelWindow.webContents.send('force-show-memo', memoId);
+  }
+});

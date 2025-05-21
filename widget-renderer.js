@@ -44,16 +44,52 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // "패널로 되돌리기" 버튼
-    returnToPanelBtn.addEventListener('click', (event) => {
+    returnToPanelBtn.addEventListener('click', async (event) => {
         if (currentMemoId) {
-            window.electronWidgetAPI.returnToPanel(currentMemoId);
+            try {
+                console.log('패널로 되돌리기 버튼 클릭, 메모 ID:', currentMemoId);
+
+                // 먼저 위젯 상태를 false로 업데이트
+                await window.electronWidgetAPI.updateWidgetStatus(currentMemoId, false);
+
+                // 패널에 메모가 표시되도록 알림
+                window.electronWidgetAPI.notifyPanelToShowMemo(currentMemoId);
+
+                // 패널로 되돌리기 이벤트 발생
+                window.electronWidgetAPI.returnToPanel(currentMemoId);
+
+                // 패널 새로고침 요청
+                setTimeout(() => {
+                    window.electronWidgetAPI.refreshPanel();
+                }, 200);
+            } catch (error) {
+                console.error('패널로 되돌리기 처리 중 오류:', error);
+            }
         }
     });
 
     // "위젯 닫기" 버튼 (패널로 되돌리기와 동일하게 동작)
-    closeWidgetBtn.addEventListener('click', (event) => {
-         if (currentMemoId) {
-            window.electronWidgetAPI.closeWidget(currentMemoId);
+    closeWidgetBtn.addEventListener('click', async (event) => {
+        if (currentMemoId) {
+            try {
+                console.log('위젯 닫기 버튼 클릭, 메모 ID:', currentMemoId);
+
+                // 먼저 위젯 상태를 false로 업데이트
+                await window.electronWidgetAPI.updateWidgetStatus(currentMemoId, false);
+
+                // 패널에 메모가 표시되도록 알림
+                window.electronWidgetAPI.notifyPanelToShowMemo(currentMemoId);
+
+                // 패널로 되돌리기 이벤트 발생
+                window.electronWidgetAPI.closeWidget(currentMemoId);
+
+                // 패널 새로고침 요청
+                setTimeout(() => {
+                    window.electronWidgetAPI.refreshPanel();
+                }, 200);
+            } catch (error) {
+                console.error('위젯 닫기 처리 중 오류:', error);
+            }
         }
     });
 

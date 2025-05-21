@@ -386,15 +386,168 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 위젯 닫힘 이벤트
         window.electronAPI.onWidgetClosed((memoId) => {
-            const memoToUpdate = memos.find(memo => memo.id === Number.parseInt(memoId, 10));
+            console.log('위젯 닫힘 이벤트 수신:', memoId, '타입:', typeof memoId);
+
+            // memoId가 문자열인 경우만 파싱, 아니면 그대로 사용
+            const id = typeof memoId === 'string' ? Number.parseInt(memoId, 10) : memoId;
+
+            // 숫자와 문자열 둘 다 확인 (형변환 문제 대비)
+            const memoToUpdate = memos.find(memo => memo.id === id || memo.id === memoId);
+
             if (memoToUpdate) {
+                console.log('위젯에서 패널로 되돌릴 메모 찾음:', memoToUpdate.id);
+                // 명시적으로 boolean false로 설정 (undefined나 null이 아닌)
                 memoToUpdate.isWidget = false;
-                saveMemosToStorage();
-                renderMemos();
+
+                // 패널에 복원된 메모 표시를 위한 플래그 설정
+                memoToUpdate.recentlyRestored = true;
+
+                // 강제 표시 플래그 설정
+                memoToUpdate.forceVisible = true;
+
+                // 즉시 데이터베이스에 변경사항 저장 (최우선)
+                saveMemosToStorage()
+                    .then(() => {
+                        console.log(`메모 ID ${memoToUpdate.id}의 isWidget 상태가 false로 업데이트되어 저장됨`);
+
+                        // 필터 임시 저장
+                        const tempFilters = {...activeFilters};
+
+                        // 모든 필터 해제하여 메모가 반드시 보이게 함
+                        activeFilters.category = 'all';
+                        activeFilters.priority = 'all';
+                        activeFilters.searchTerm = '';
+
+                        // UI 업데이트
+                        if (searchInput) searchInput.value = '';
+                        if (categorySelect) categorySelect.value = 'all';
+                        if (prioritySelect) prioritySelect.value = 'all';
+
+                        // 메모 렌더링
+                        return renderMemos().then(() => {
+                            // 해당 메모로 스크롤 - 자동 포커스
+                            const memoElement = document.querySelector(`.memo-item[data-id="${memoToUpdate.id}"]`);
+                            if (memoElement) {
+                                memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                                // 시각적 하이라이트 강화
+                                memoElement.classList.add('highlight-memo');
+                                memoElement.style.border = '2px solid #4a90e2';
+                                memoElement.style.boxShadow = '0 0 15px rgba(74, 144, 226, 0.5)';
+
+                                setTimeout(() => {
+                                    memoElement.classList.remove('highlight-memo');
+                                    memoElement.style.border = '';
+                                    memoElement.style.boxShadow = '';
+                                }, 3000);
+                            }
+
+                            // 성공 메시지 표시
+                            showToast('메모가 패널에 복원되었습니다.');
+                        });
+                    })
+                    .catch(error => {
+                        console.error('위젯에서 패널로 되돌릴 때 메모 저장/렌더링 오류:', error);
+                        showErrorNotification('메모 상태 저장 중 오류가 발생했습니다.');
+                    });
+            } else {
+                console.error('위젯에서 패널로 되돌릴 메모를 찾을 수 없음:', memoId);
+                // 모든 메모 출력해서 디버깅
+                console.log('현재 메모 목록:', memos.map(m => ({id: m.id, type: typeof m.id})));
+                showErrorNotification('메모를 찾을 수 없습니다.');
             }
         });
 
-        // 위젯 상태 업데이트 이벤트
+        // 메모 강제 표시 이벤트 - 위젯에서 패널로 되돌리기 시 호출됨
+        window.electronAPI.onForceShowMemo((memoId) => {
+            console.log(`메모 강제 표시 요청 수신: memoId=${memoId}`);
+
+            // memoId가 문자열인 경우만 파싱, 아니면 그대로 사용
+            const id = typeof memoId === 'string' ? Number.parseInt(memoId, 10) : memoId;
+
+            // 해당 메모 찾기
+            const memoToShow = memos.find(memo => memo.id === id || memo.id === memoId);
+
+            if (memoToShow) {
+                console.log(`메모 ID ${memoToShow.id} 강제 표시를 위한 플래그 설정`);
+
+                // 강제 표시 플래그 설정
+                memoToShow.isWidget = false;
+                memoToShow.recentlyRestored = true;
+                memoToShow.forceVisible = true;
+
+                // 모든 필터 초기화
+                activeFilters.category = 'all';
+                activeFilters.priority = 'all';
+                activeFilters.searchTerm = '';
+
+                // UI 업데이트
+                if (searchInput) searchInput.value = '';
+                if (categorySelect) categorySelect.value = 'all';
+                if (prioritySelect) prioritySelect.value = 'all';
+
+                // 데이터 저장 및 UI 업데이트
+                saveMemosToStorage()
+                    .then(() => renderMemos())
+                    .then(() => {
+                        // 해당 메모 요소 찾기
+                        const memoElement = document.querySelector(`.memo-item[data-id="${memoToShow.id}"]`);
+                        if (memoElement) {
+                            console.log(`메모 ID ${memoToShow.id} 요소를 찾음, 스크롤 실행`);
+
+                            // 중앙으로 스크롤
+                            memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                            // 시각적 하이라이트 강화
+                            memoElement.classList.add('highlight-memo');
+                            memoElement.style.border = '2px solid #4a90e2';
+                            memoElement.style.boxShadow = '0 0 15px rgba(74, 144, 226, 0.5)';
+
+                            setTimeout(() => {
+                                memoElement.classList.remove('highlight-memo');
+                                memoElement.style.border = '';
+                                memoElement.style.boxShadow = '';
+                            }, 3000);
+
+                            // 토스트 메시지
+                            showToast('메모가 패널에 복원되었습니다.');
+                        } else {
+                            console.error(`메모 ID ${memoToShow.id}에 해당하는 DOM 요소를 찾을 수 없음`);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('메모 강제 표시 중 오류:', error);
+                    });
+            } else {
+                console.error(`강제 표시할 메모를 찾을 수 없음: ${memoId}`);
+            }
+        });
+
+        // 모든 필터 초기화 이벤트
+        window.electronAPI.onResetAllFilters(() => {
+            console.log('모든 필터 초기화 요청 수신');
+
+            // 모든 필터 초기화
+            activeFilters.category = 'all';
+            activeFilters.priority = 'all';
+            activeFilters.searchTerm = '';
+
+            // UI 업데이트
+            if (searchInput) searchInput.value = '';
+            if (categorySelect) categorySelect.value = 'all';
+            if (prioritySelect) prioritySelect.value = 'all';
+
+            // 메모 목록 다시 렌더링
+            renderMemos()
+                .then(() => {
+                    console.log('필터 초기화 및 메모 렌더링 완료');
+                })
+                .catch(error => {
+                    console.error('필터 초기화 후 렌더링 중 오류:', error);
+                });
+        });
+
+        // 위젯의 상태 업데이트 이벤트
         window.electronAPI.onUpdateMemoWidgetState((data) => {
             const { id, position, size } = data;
             const memoToUpdate = memos.find(memo => memo.id === id);
@@ -432,6 +585,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.electronAPI.onUpdateDownloaded((info) => {
             showUpdateNotification(`새 버전 ${info.version}이 설치 준비되었습니다. 앱을 재시작하면 업데이트가 적용됩니다.`);
+        });
+
+        // 위젯 상태 업데이트 이벤트 - 패널에서 위젯의 isWidget 속성이 변경되었을 때
+        window.electronAPI.onUpdateWidgetStatus(({ memoId, isWidget }) => {
+            console.log(`위젯 상태 업데이트 이벤트 수신: 메모 ID ${memoId}, 위젯 상태 ${isWidget}`);
+
+            // 해당 메모 찾기
+            const memoToUpdate = memos.find(memo => memo.id === memoId);
+            if (memoToUpdate) {
+                console.log(`메모 ID ${memoId}의 위젯 상태를 ${isWidget}로 업데이트`);
+                memoToUpdate.isWidget = isWidget;
+                saveMemosToStorage().then(() => {
+                    // 상태가 변경된 메모 관련 UI 업데이트
+                    renderMemos().then(() => {
+                        // 위젯에서 패널로 돌아온 경우 메모로 스크롤
+                        if (!isWidget) {
+                            const memoElement = document.querySelector(`.memo-item[data-id="${memoId}"]`);
+                            if (memoElement) {
+                                memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                                // 시각적 하이라이트 효과
+                                memoElement.classList.add('highlight-memo');
+                                setTimeout(() => {
+                                    memoElement.classList.remove('highlight-memo');
+                                }, 2000);
+                            }
+                        }
+                    });
+                });
+            }
+        });
+
+        // 패널 메모 목록 새로고침 이벤트
+        window.electronAPI.onRefreshMemos(() => {
+            console.log('메모 목록 새로고침 요청 수신');
+
+            // 메모 목록 다시 로드 후 렌더링
+            loadMemosFromStorage().then(() => {
+                console.log('메모 목록 새로고침 완료');
+            }).catch(error => {
+                console.error('메모 목록 새로고침 중 오류:', error);
+            });
+        });
+
+        // 저장된 메모로 즉시 포커스 요청
+        window.electronAPI.onShowPanelAndFocusMemo((memoId) => {
+            console.log(`메모 ID ${memoId}로 포커스 요청 수신`);
+
+            // 먼저 메모 렌더링 확인
+            renderMemos().then(() => {
+                // 해당 메모 요소 찾기
+                const memoElement = document.querySelector(`.memo-item[data-id="${memoId}"]`);
+                if (memoElement) {
+                    console.log(`메모 ID ${memoId} 요소 찾음, 스크롤 및 강조 표시`);
+
+                    // 스크롤 및 강조 효과
+                    memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    memoElement.classList.add('highlight-memo');
+                    memoElement.style.border = '2px solid #4a90e2';
+                    memoElement.style.boxShadow = '0 0 15px rgba(74, 144, 226, 0.5)';
+
+                    // 3초 후 강조 효과 제거
+                    setTimeout(() => {
+                        memoElement.classList.remove('highlight-memo');
+                        memoElement.style.border = '';
+                        memoElement.style.boxShadow = '';
+                    }, 3000);
+                } else {
+                    console.error(`메모 ID ${memoId}에 대한 요소를 찾을 수 없음`);
+                }
+            });
         });
     }
 
@@ -573,15 +797,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('우선순위 필터링 후 메모 수:', filteredMemos.length);
         }
 
-        // 위젯 필터링 (위젯으로 나와있는 메모는 기본적으로 표시하지 않음, 검색 시에만 표시)
-        if (!activeFilters.searchTerm && activeFilters.category === 'all' && activeFilters.priority === 'all') {
-            filteredMemos = filteredMemos.filter(memo => !memo.isWidget);
-            console.log('위젯 필터링 후 메모 수:', filteredMemos.length);
-        }
-
-        // 정렬
+        // 정렬 적용
         filteredMemos = sortMemos(filteredMemos, activeFilters.sortOrder);
-        console.log('정렬 완료, 최종 표시 메모 수:', filteredMemos.length);
 
         // 결과 없음 메시지
         if (filteredMemos.length === 0) {
@@ -597,12 +814,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         for (const memo of filteredMemos) {
-            // 위젯으로 나와있는 메모는 패널 목록에 그리지 않음
-            if (memo.isWidget && !activeFilters.searchTerm) continue;
-
+            // 위젯 상태인 메모 처리 (제거하지 않고 시각적으로 표현)
             const memoDiv = document.createElement('div');
             memoDiv.classList.add('memo-item');
             memoDiv.dataset.id = memo.id;
+
+            // 위젯인 경우 스타일 변경
+            if (memo.isWidget) {
+                // 투명도 낮추기
+                memoDiv.style.opacity = '0.7';
+                memoDiv.classList.add('widget-mode');
+            }
+
+            // 강제 표시 플래그가 있으면 특별 스타일 적용 (위젯에서 패널로 돌아온 경우)
+            if (memo.forceVisible || memo.recentlyRestored) {
+                memoDiv.classList.add('highlight-memo');
+                memoDiv.style.border = '2px solid #4a90e2';
+                memoDiv.style.boxShadow = '0 0 15px rgba(74, 144, 226, 0.5)';
+
+                // 3초 후 강조 효과 제거
+                setTimeout(() => {
+                    memoDiv.classList.remove('highlight-memo');
+                    memoDiv.style.border = '';
+                    memoDiv.style.boxShadow = '';
+
+                    // 플래그도 제거 (일회성)
+                    memo.forceVisible = false;
+                    memo.recentlyRestored = false;
+                }, 3000);
+            }
 
             // 우선순위에 따른 클래스 추가
             if (memo.priority) {
@@ -630,6 +870,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentContainer.appendChild(priorityBadge);
             }
 
+            // 위젯 모드 뱃지 추가
+            if (memo.isWidget) {
+                const widgetBadge = document.createElement('div');
+                widgetBadge.classList.add('widget-badge');
+                widgetBadge.textContent = '위젯 모드';
+                contentContainer.appendChild(widgetBadge);
+            }
+
             // 미리보기 모드와 편집 모드를 위한 요소들
             const viewModeDiv = document.createElement('div');
             viewModeDiv.classList.add('memo-content', 'view-mode');
@@ -641,14 +889,6 @@ document.addEventListener('DOMContentLoaded', () => {
             editModeDiv.setAttribute('contenteditable', 'true');
             editModeDiv.textContent = memo.text;
             editModeDiv.style.display = 'none';
-
-            // 위젯 상태 표시 (위젯으로 떠 있을 경우)
-            if (memo.isWidget) {
-                const widgetBadge = document.createElement('span');
-                widgetBadge.classList.add('widget-badge');
-                widgetBadge.textContent = '위젯 모드';
-                memoDiv.appendChild(widgetBadge);
-            }
 
             // 내용 변경 시 저장
             editModeDiv.addEventListener('blur', async (event) => {
@@ -1333,7 +1573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 설정 저장
                 const currentSettings = await window.electronAPI.getSettings();
                 const updatedSettings = { ...currentSettings, theme: newTheme };
-                await window.electronAPI.saveSettings(updatedSettings);
+                await window.electronAPI.updateSettings(updatedSettings);
 
                 // 아이콘 업데이트
                 updateThemeIcons();
