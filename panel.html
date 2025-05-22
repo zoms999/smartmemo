@@ -5,24 +5,126 @@
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
     <title>MemoWave</title>
     <link rel="stylesheet" href="panel-style.css">
+    <style>
+        /* 드롭다운 가시성 긴급 수정 */
+        #view-settings-dropdown {
+            background-color: #ffffff;
+            border: 2px solid #3498db !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+            color: #333333 !important;
+            display: none;
+            z-index: 1500 !important;
+            position: absolute !important;
+            top: 40px !important;
+            right: 90px !important;
+        }
+
+        #view-settings-dropdown.show {
+            display: block !important;
+        }
+
+        .dropdown-item {
+            color: #333333 !important;
+            padding: 8px 12px !important;
+        }
+
+        .checkbox-label {
+            color: #333333 !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+        }
+
+        .dropdown-header {
+            color: #3498db !important;
+            font-weight: bold !important;
+            border-bottom: 1px solid #e0e0e0 !important;
+            padding: 8px 12px !important;
+        }
+
+        .dropdown-footer {
+            border-top: 1px solid #e0e0e0 !important;
+            padding: 8px 12px !important;
+            text-align: right !important;
+        }
+
+        .secondary-btn {
+            background-color: #f8f9fa !important;
+            color: #333333 !important;
+            border: 1px solid #e0e0e0 !important;
+            padding: 5px 12px !important;
+            border-radius: 4px !important;
+            cursor: pointer !important;
+        }
+
+        /* 다크 모드일 때의 스타일 */
+        [data-theme="dark"] #view-settings-dropdown {
+            background-color: #2d2d2d !important;
+            color: #f0f0f0 !important;
+            border-color: #5dade2 !important;
+        }
+
+        [data-theme="dark"] .dropdown-item,
+        [data-theme="dark"] .checkbox-label {
+            color: #f0f0f0 !important;
+        }
+
+        [data-theme="dark"] .secondary-btn {
+            background-color: #333333 !important;
+            color: #f0f0f0 !important;
+            border-color: #444444 !important;
+        }
+    </style>
 </head>
 <body>
     <div class="panel-container">
         <div class="panel-header">
             <h1>MemoWave</h1>
             <div class="header-actions">
+                <button id="view-settings-btn" class="icon-btn" title="보기 설정 (Ctrl+Shift+V)">
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path fill="currentColor" d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"></path>
+                    </svg>
+                    <span class="btn-tooltip">보기</span>
+                </button>
+                <div id="view-settings-dropdown" class="dropdown-menu">
+                    <div class="dropdown-header">보기 설정</div>
+                    <div class="dropdown-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="toggle-toolbar-checkbox" checked> 마크다운 툴바 표시
+                        </label>
+                    </div>
+                    <div class="dropdown-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="toggle-compact-checkbox"> 컴팩트 모드
+                        </label>
+                    </div>
+                    <div class="dropdown-item">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="toggle-input-area-checkbox"> 입력 영역 접기
+                        </label>
+                    </div>
+                    <div class="dropdown-footer">
+                        <button id="shortcut-help-btn" class="secondary-btn">단축키 도움말</button>
+                    </div>
+                </div>
                 <button id="auth-button" title="로그인/로그아웃" class="icon-btn login-button" data-action="login">
                     <svg viewBox="0 0 24 24" width="18" height="18">
                         <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path>
                     </svg>
+                    <span class="btn-tooltip">계정</span>
                 </button>
                 <span id="auth-info" class="auth-info"></span>
-                <button id="settings-btn" title="설정" class="icon-btn">
+                <button id="settings-btn" title="앱 설정 (Ctrl+,)" class="icon-btn">
                     <svg viewBox="0 0 24 24" width="20" height="20">
                         <path fill="currentColor" d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"></path>
                     </svg>
+                    <span class="btn-tooltip">설정</span>
                 </button>
-                <button id="close-btn" title="패널 닫기" class="icon-btn">×</button>
+                <button id="close-btn" title="패널 닫기" class="icon-btn">
+                    <span class="close-icon">×</span>
+                    <span class="btn-tooltip">닫기</span>
+                </button>
             </div>
         </div>
 
@@ -34,9 +136,15 @@
                         <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path>
                     </svg>
                 </button>
+                <button id="filter-toggle-btn" class="icon-btn filter-toggle-btn" title="필터 및 정렬 설정 (Ctrl+F)">
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                        <path fill="currentColor" d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"></path>
+                    </svg>
+                    <span class="btn-tooltip">필터</span>
+                </button>
             </div>
 
-            <div class="filter-container">
+            <div class="filter-container" id="filter-container" style="display: none;">
                 <div class="filter-row">
                     <select id="category-filter" title="카테고리별 필터링">
                         <option value="all">모든 카테고리</option>
@@ -101,7 +209,7 @@
 
             <div class="input-container">
                 <textarea id="memo-input" placeholder="새 메모 내용 입력... (마크다운 지원)" rows="3"></textarea>
-                <div class="memo-input-controls">
+                <div class="memo-options-row">
                     <div class="memo-options">
                         <select id="new-memo-category" title="카테고리 선택">
                             <option value="">카테고리 없음</option>
@@ -112,9 +220,15 @@
                             <option value="1">⭐ 중요</option>
                             <option value="2">🔥 긴급</option>
                         </select>
+
                     </div>
-                    <button id="add-memo-btn" class="primary-btn">추가</button>
                 </div>
+                <button id="add-memo-btn" class="primary-btn full-width-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" class="add-icon">
+                        <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path>
+                    </svg>
+                    메모 추가 (Ctrl+Enter)
+                </button>
             </div>
         </div>
 
@@ -124,35 +238,38 @@
 
         <div class="panel-footer">
             <div class="footer-tools">
-                <button id="markdown-hint-btn" title="마크다운 도움말" class="icon-btn footer-icon">
+                <button id="markdown-hint-btn" title="마크다운 도움말 (Ctrl+H)" class="icon-btn footer-icon">
                     <svg viewBox="0 0 24 24" width="18" height="18">
-                        <path fill="currentColor" d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"></path>
+                        <path fill="currentColor" d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"></path>
                     </svg>
+                    <span class="footer-icon-text">도움말</span>
                 </button>
-                <button id="export-btn" title="데이터 내보내기" class="icon-btn footer-icon">
+                <button id="export-btn" title="데이터 내보내기 (Ctrl+E)" class="icon-btn footer-icon">
                     <svg viewBox="0 0 24 24" width="18" height="18">
                         <path fill="currentColor" d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"></path>
                     </svg>
+                    <span class="footer-icon-text">내보내기</span>
                 </button>
-                <button id="import-btn" title="데이터 가져오기" class="icon-btn footer-icon">
+                <button id="import-btn" title="데이터 가져오기 (Ctrl+I)" class="icon-btn footer-icon">
                     <svg viewBox="0 0 24 24" width="18" height="18">
                         <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path>
                     </svg>
+                    <span class="footer-icon-text">가져오기</span>
                 </button>
-                <button id="theme-toggle-btn" title="테마 변경" class="icon-btn footer-icon">
+                <button id="theme-toggle-btn" title="테마 변경 (Ctrl+T)" class="icon-btn footer-icon">
                     <svg viewBox="0 0 24 24" width="18" height="18" class="theme-light-icon">
                         <path fill="currentColor" d="M20 8.69V4h-4.69L12 0.69 8.69 4H4v4.69L0.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm0-10c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z"></path>
                     </svg>
                     <svg viewBox="0 0 24 24" width="18" height="18" class="theme-dark-icon" style="display:none;">
                         <path fill="currentColor" d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"></path>
                     </svg>
+                    <span class="footer-icon-text">테마</span>
                 </button>
             </div>
             <div class="app-version">
                 <span id="app-version">v1.0.0</span>
             </div>
 
-            <!-- 마크다운 도움말 모달 -->
             <div id="markdown-modal" class="markdown-modal">
                 <div class="markdown-modal-content">
                     <div class="markdown-modal-header">
@@ -175,49 +292,59 @@
                     </div>
                 </div>
             </div>
+
+            <div id="shortcut-help-modal" class="markdown-modal">
+                <div class="markdown-modal-content">
+                    <div class="markdown-modal-header">
+                        <h3>키보드 단축키</h3>
+                        <button id="close-shortcut-modal" class="icon-btn">×</button>
+                    </div>
+                    <div class="markdown-modal-body">
+                        <div class="shortcut-examples">
+                            <p><code>Ctrl+Enter</code> - 메모 추가</p>
+                            <p><code>Ctrl+F</code> - 필터/검색 토글</p>
+                            <p><code>Ctrl+H</code> - 마크다운 도움말</p>
+                            <p><code>Ctrl+E</code> - 데이터 내보내기</p>
+                            <p><code>Ctrl+I</code> - 데이터 가져오기</p>
+                            <p><code>Ctrl+T</code> - 테마 변경</p>
+                            <p><code>Ctrl+,</code> - 앱 설정</p>
+                            <p><code>Ctrl+Shift+V</code> - 보기 설정</p>
+                            <p><code>Alt+N</code> - 새 메모로 포커스 이동</p>
+                            <p><code>Alt+F</code> - 검색창 포커스 이동</p>
+                            <p><code>Esc</code> - 현재 작업 취소</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="widget-mode-modal" class="markdown-modal">
+                <div class="markdown-modal-content">
+                    <div class="markdown-modal-header">
+                        <h3>위젯 모드</h3>
+                        <button id="close-widget-modal" class="icon-btn">×</button>
+                    </div>
+                    <div class="markdown-modal-body">
+                        <p>위젯 모드는 메모를 항상 화면 최상단에 표시하는 기능입니다. 다른 창 위에 떠 있어 작업 중에도 참고할 수 있습니다.</p>
+                        <p>주요 기능:</p>
+                        <ul>
+                            <li>항상 위에 표시 (Always on Top)</li>
+                            <li>크기 조절 가능</li>
+                            <li>투명도 조절 가능</li>
+                            <li>더블 클릭으로 편집 모드 전환</li>
+                            <li>최소화/최대화 지원</li>
+                        </ul>
+                        <p class="tip-text">메모 생성 후 메모 아이템의 <span class="widget-icon-text">📌</span> 버튼을 클릭하여 기존 메모를 위젯으로 변환할 수도 있습니다.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // 페이지 로드 직후 실행되는 스크립트
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('페이지 로드 완료 - 인라인 스크립트');
+            console.log('페이지 로드 완료');
 
-            // 로그인 버튼 직접 처리
-            const loginButton = document.getElementById('auth-button');
-            if (loginButton) {
-                console.log('로그인 버튼을 찾았습니다 - 인라인 스크립트');
-
-                // 직접 클릭 이벤트 리스너 추가
-                loginButton.addEventListener('click', function(e) {
-                    console.log('로그인 버튼 클릭됨 - 인라인 스크립트');
-                    e.preventDefault();
-
-                    try {
-                        // window.electronAPI 확인
-                        if (window.electronAPI && window.electronAPI.openLoginWindow) {
-                            console.log('electronAPI.openLoginWindow 호출 - 인라인 스크립트');
-                            window.electronAPI.openLoginWindow();
-                        } else {
-                            console.error('electronAPI가 없거나 openLoginWindow 메서드가 없습니다 - 인라인 스크립트');
-                            alert('로그인 기능을 사용할 수 없습니다. 개발자 도구를 확인하세요.');
-                        }
-                    } catch (error) {
-                        console.error('로그인 처리 중 오류:', error);
-                        alert('로그인 처리 중 오류가 발생했습니다: ' + error.message);
-                    }
-                });
-
-                // 버튼 스타일 강조
-                loginButton.style.cursor = 'pointer';
-                loginButton.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
-
-                console.log('로그인 버튼 설정 완료 - 인라인 스크립트');
-            } else {
-                console.error('로그인 버튼을 찾을 수 없습니다 - 인라인 스크립트');
-            }
-
-            // 디버깅용 전역 함수 추가
+            // 개발자 도구에서 테스트용 함수 제공
             window.openLoginWindowManually = function() {
                 console.log('수동 로그인 창 열기 함수 호출됨');
                 if (window.electronAPI && window.electronAPI.openLoginWindow) {
@@ -231,6 +358,6 @@
             console.log('인라인 스크립트 설정 완료 - 개발자 도구에서 window.openLoginWindowManually() 실행 가능');
         });
     </script>
-        <script src="panel-renderer.js"></script>
+    <script src="panel-renderer.js"></script>
 </body>
 </html>

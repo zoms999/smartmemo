@@ -1917,6 +1917,16 @@ async function handleOAuthCallback(callbackUrl) { // async 키워드 추가
               });
               console.log("메인 프로세스: 로그인 성공 이벤트 전송 완료");
 
+              // 패널 윈도우에도 로그인 성공 이벤트 전송
+              if (panelWindow && !panelWindow.isDestroyed()) {
+                console.log("메인 프로세스: 패널 윈도우에 로그인 성공 이벤트 전송");
+                panelWindow.webContents.send('login-success', {
+                  success: true,
+                  user: data?.user || null,
+                  session: data?.session || null
+                });
+              }
+
               // 짧은 딜레이 후 로그인 창 닫기 (UI 메시지가 표시될 시간을 주기 위함)
               setTimeout(() => {
                 console.log("메인 프로세스: 로그인 창 닫기 타이머 실행");

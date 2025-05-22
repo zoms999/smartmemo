@@ -137,7 +137,10 @@ const electronAPI = {
     },
 
     // 로그인 오류 이벤트 수신
-    onLoginError: createLoggedReceiver('login-error')
+    onLoginError: createLoggedReceiver('login-error'),
+
+    // 로그인 성공 이벤트 수신 - 추가된 부분
+    onLoginSuccess: createLoggedReceiver('login-success')
 };
 
 // API 노출

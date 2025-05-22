@@ -17,6 +17,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const importBtn = document.getElementById('import-btn');
     const settingsBtn = document.getElementById('settings-btn');
 
+    // 추가 UI 요소 참조
+    const filterToggleBtn = document.getElementById('filter-toggle-btn');
+    const filterContainer = document.getElementById('filter-container');
+    const viewSettingsBtn = document.getElementById('view-settings-btn');
+    const viewSettingsDropdown = document.getElementById('view-settings-dropdown');
+    const widgetModeHelpBtn = document.getElementById('widget-mode-help');
+
     // 로그인 버튼 직접 획득 - DOM 로드 시점
     const authButton = document.getElementById('auth-button');
     console.log('초기 로그인 버튼 참조:', authButton ? '성공' : '실패');
@@ -69,6 +76,12 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             console.log('애플리케이션 초기화 시작');
 
+            // 변수 초기화 확인을 위한 디버깅 로그
+            console.log('viewSettingsBtn 존재 여부:', !!viewSettingsBtn);
+            console.log('viewSettingsDropdown 존재 여부:', !!viewSettingsDropdown);
+            console.log('viewSettingsBtn 요소:', viewSettingsBtn);
+            console.log('viewSettingsDropdown 요소:', viewSettingsDropdown);
+
             // 메모 입력 영역 토글 버튼 설정
             setupMemoEditorToggle();
 
@@ -77,7 +90,22 @@ document.addEventListener('DOMContentLoaded', () => {
             applySettings();
 
             // 드래그 앤 드롭을 위한 메모 컨테이너 설정
-            setupDragAndDrop();
+            setupDragAndDrop(memosContainer);
+
+            // 필터 토글 기능 설정
+            setupFilterToggle();
+
+            // 보기 설정 드롭다운 설정
+            setupViewSettingsDropdown();
+
+            // 위젯 모드 설명 모달 설정
+            setupWidgetModeHelp();
+
+            // 단축키 도움말 모달 설정
+            setupShortcutHelpModal();
+
+            // 키보드 단축키 설정
+            setupKeyboardShortcuts();
 
             // 로그인 상태 확인
             const auth = await window.electronAPI.getAuthStatus();
@@ -150,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setupEventListeners();
 
             // 로그인 오류 핸들러 설정
-            setupLoginErrorHandler();
+            setupLoginErrorHandler(loadMemosFromStorage, updateFilterUI);
 
             console.log('애플리케이션 초기화 완료');
         } catch (error) {
@@ -166,7 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 아이콘 변경 및 클래스 추가
         if (isLoggedIn && user) {
+            // 먼저 모든 관련 클래스 제거
+            loginButton.classList.remove('login-button');
+            // 로그인 상태 클래스 추가
             loginButton.classList.add('logged-in');
+            loginButton.style.color = '#2ecc71'; // 직접 녹색 스타일 적용
             loginButton.dataset.action = 'logout';
             loginButton.title = `로그아웃 (${user.email})`;
 
@@ -175,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <svg viewBox="0 0 24 24" width="18" height="18">
                     <path fill="#2ecc71" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path>
                 </svg>
+                <span class="btn-tooltip">계정</span>
             `;
 
             // 사용자 정보 표시
@@ -194,7 +227,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } else {
+            // 로그아웃 상태로 변경
             loginButton.classList.remove('logged-in');
+            loginButton.classList.add('login-button');
+            loginButton.style.color = '#e74c3c'; // 빨간색 직접 적용
             loginButton.dataset.action = 'login';
             loginButton.title = '로그인';
 
@@ -203,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <svg viewBox="0 0 24 24" width="18" height="18">
                     <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"></path>
                 </svg>
+                <span class="btn-tooltip">계정</span>
             `;
 
             // 사용자 정보 제거
@@ -285,378 +322,396 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 이벤트 리스너 설정
     function setupEventListeners() {
-        console.log('setupEventListeners 함수 시작');
+        console.log('이벤트 리스너 설정');
 
-        // 로그인 버튼 이벤트 리스너 연결
-        const authButton = document.getElementById('auth-button');
-        if (authButton) {
-            console.log('로그인 버튼 이벤트 리스너 추가');
-
-            // 클릭 이벤트 대신 마우스 오버 이벤트로 변경
-            authButton.addEventListener('mouseenter', async (e) => {
-                // 현재 로그인 상태 확인
-                const auth = await window.electronAPI.getAuthStatus();
-                const isLoggedIn = auth?.isLoggedIn;
-
-                // 로그인된 상태일 때만 드롭다운 메뉴 표시
-                if (isLoggedIn) {
-                    showAuthDropdown();
-                } else {
-                    // 로그인되지 않은 상태에서는 클릭 시 로그인 창 열기
-                    authButton.addEventListener('click', handleLoginClick);
-                }
-            });
-        } else {
-            console.error('로그인 버튼을 찾을 수 없습니다!');
-        }
-
-        // 패널 관련 이벤트
-        const closeBtn = document.getElementById('close-btn');
+        // 패널 닫기 버튼
         closeBtn.addEventListener('click', closePanel);
 
-        // 필터 변경 이벤트
-        console.log('필터 이벤트 리스너 설정 시작');
+        // 검색 및 필터 이벤트
+        searchInput.addEventListener('input', handleSearchInput);
+        categorySelect.addEventListener('change', handleFilterChange);
+        prioritySelect.addEventListener('change', handleFilterChange);
+        sortSelect.addEventListener('change', handleFilterChange);
 
-        // 이미 상단에서 선언된 변수 재사용
-        console.log('카테고리 필터 요소:', categorySelect ? '찾음' : '못찾음');
-        console.log('우선순위 필터 요소:', prioritySelect ? '찾음' : '못찾음');
-        console.log('정렬 필터 요소:', sortSelect ? '찾음' : '못찾음');
-        console.log('검색 입력 요소:', searchInput ? '찾음' : '못찾음');
+        // 메모 추가 버튼
+        addMemoBtn.addEventListener('click', addMemo);
 
-        categorySelect.addEventListener('change', () => {
-            console.log('카테고리 필터 변경됨:', categorySelect.value);
-            activeFilters.category = categorySelect.value;
-            renderMemos();
+        // 메모 입력 박스에서 Ctrl+Enter로 메모 추가
+        memoInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                e.preventDefault();
+                addMemo();
+            }
         });
 
-        prioritySelect.addEventListener('change', () => {
-            console.log('우선순위 필터 변경됨:', prioritySelect.value);
-            activeFilters.priority = prioritySelect.value;
-            renderMemos();
-        });
+        // 기타 이벤트 설정
+        setupMarkdownModal();
+        setupThemeToggle();
+    }
 
-        sortSelect.addEventListener('change', () => {
-            console.log('정렬 필터 변경됨:', sortSelect.value);
-            activeFilters.sortOrder = sortSelect.value;
-            renderMemos();
-        });
-
+    // 검색 입력 핸들러
+    function handleSearchInput() {
+        const searchTerm = searchInput.value.toLowerCase();
         const clearSearchBtn = document.getElementById('clear-search-btn');
 
-        // 검색 이벤트 - 입력 지연 처리
-        searchInput.addEventListener('input', debounce(() => {
-            activeFilters.searchTerm = searchInput.value.toLowerCase();
-            clearSearchBtn.style.display = activeFilters.searchTerm ? 'block' : 'none';
-            renderMemos();
-        }, 300));
+        activeFilters.searchTerm = searchTerm;
+        clearSearchBtn.style.display = searchTerm ? 'block' : 'none';
 
-        // 검색 지우기 버튼
-        clearSearchBtn.addEventListener('click', () => {
-            searchInput.value = '';
-            activeFilters.searchTerm = '';
-            clearSearchBtn.style.display = 'none';
-            renderMemos();
-        });
+        renderMemos();
 
-        // 메모 추가 관련 설정
-        setupAddMemoButton();
+        // 검색어가 있을 때 '검색 결과 없음' 메시지 표시 로직
+        if (searchTerm && document.querySelectorAll('.memo-item').length === 0) {
+            const noResultsElem = document.createElement('div');
+            noResultsElem.className = 'no-search-results';
+            noResultsElem.textContent = `"${searchTerm}" 검색 결과가 없습니다.`;
+            memosContainer.appendChild(noResultsElem);
+        }
+    }
 
-        // 내보내기/가져오기 버튼
-        const exportBtn = document.getElementById('export-btn');
-        const importBtn = document.getElementById('import-btn');
+    // 필터 변경 핸들러
+    function handleFilterChange() {
+        activeFilters.category = categorySelect.value;
+        activeFilters.priority = prioritySelect.value;
+        activeFilters.sortOrder = sortSelect.value;
 
-        exportBtn.addEventListener('click', exportData);
-        importBtn.addEventListener('click', importData);
+        renderMemos();
+    }
 
-        // 설정 버튼
-        settingsBtn.addEventListener('click', () => {
-            window.electronAPI.openSettingsWindow();
-        });
+    // 필터 토글 기능 설정
+    function setupFilterToggle() {
+        if (!filterToggleBtn || !filterContainer) return;
 
-        // 위젯에서 메모 업데이트 이벤트
-        window.electronAPI.onMemoUpdateFromWidget(async (data) => {
-            const { memoId, newContent } = data;
-            const memoToUpdate = memos.find(memo => memo.id === memoId);
-            if (memoToUpdate) {
-                memoToUpdate.text = newContent;
-                await saveMemosToStorage();
-                await renderMemos();
-            }
-        });
+        // 초기 상태 설정 (숨김)
+        filterContainer.style.display = 'none';
 
-        // 위젯 닫힘 이벤트
-        window.electronAPI.onWidgetClosed((memoId) => {
-            console.log('위젯 닫힘 이벤트 수신:', memoId, '타입:', typeof memoId);
+        // 토글 버튼 클릭 이벤트
+        filterToggleBtn.addEventListener('click', toggleFilter);
+    }
 
-            // memoId가 문자열인 경우만 파싱, 아니면 그대로 사용
-            const id = typeof memoId === 'string' ? Number.parseInt(memoId, 10) : memoId;
+    // 필터 토글 함수
+    function toggleFilter() {
+        if (filterContainer.style.display === 'none') {
+            filterContainer.style.display = 'block';
+            filterContainer.style.animation = 'fadeIn 0.3s ease';
+        } else {
+            filterContainer.style.display = 'none';
+        }
+    }
 
-            // 숫자와 문자열 둘 다 확인 (형변환 문제 대비)
-            const memoToUpdate = memos.find(memo => memo.id === id || memo.id === memoId);
+    // 보기 설정 드롭다운 기능 설정
+    function setupViewSettingsDropdown() {
+        // DOM 요소 직접 가져오기 (재확인)
+        const viewSettingsBtn = document.getElementById('view-settings-btn');
+        const viewSettingsDropdown = document.getElementById('view-settings-dropdown');
 
-            if (memoToUpdate) {
-                console.log('위젯에서 패널로 되돌릴 메모 찾음:', memoToUpdate.id);
-                // 명시적으로 boolean false로 설정 (undefined나 null이 아닌)
-                memoToUpdate.isWidget = false;
+        console.log('setupViewSettingsDropdown 호출됨');
+        console.log('viewSettingsBtn:', viewSettingsBtn);
+        console.log('viewSettingsDropdown:', viewSettingsDropdown);
 
-                // 패널에 복원된 메모 표시를 위한 플래그 설정
-                memoToUpdate.recentlyRestored = true;
+        if (!viewSettingsBtn || !viewSettingsDropdown) {
+            console.error('보기 설정 드롭다운 요소를 찾을 수 없습니다.');
+            return;
+        }
 
-                // 강제 표시 플래그 설정
-                memoToUpdate.forceVisible = true;
+        const toggleToolbarCheckbox = document.getElementById('toggle-toolbar-checkbox');
+        const toggleCompactCheckbox = document.getElementById('toggle-compact-checkbox');
+        const toggleInputAreaCheckbox = document.getElementById('toggle-input-area-checkbox');
+        const shortcutHelpBtn = document.getElementById('shortcut-help-btn');
 
-                // 즉시 데이터베이스에 변경사항 저장 (최우선)
-                saveMemosToStorage()
-                    .then(() => {
-                        console.log(`메모 ID ${memoToUpdate.id}의 isWidget 상태가 false로 업데이트되어 저장됨`);
+        // 초기 상태 설정
+        if (toggleToolbarCheckbox) toggleToolbarCheckbox.checked = !toolbar.classList.contains('hidden');
+        if (toggleCompactCheckbox) toggleCompactCheckbox.checked = memosContainer.classList.contains('compact-mode');
+        if (toggleInputAreaCheckbox) toggleInputAreaCheckbox.checked = memoEditorContainer.classList.contains('collapsed');
 
-                        // 필터 임시 저장
-                        const tempFilters = {...activeFilters};
+        // 버튼 클릭시 드롭다운 토글
+        viewSettingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            viewSettingsDropdown.classList.toggle('show');
+            console.log('보기 설정 토글 클릭됨. 드롭다운 표시 상태:', viewSettingsDropdown.classList.contains('show'));
 
-                        // 모든 필터 해제하여 메모가 반드시 보이게 함
-                        activeFilters.category = 'all';
-                        activeFilters.priority = 'all';
-                        activeFilters.searchTerm = '';
-
-                        // UI 업데이트
-                        if (searchInput) searchInput.value = '';
-                        if (categorySelect) categorySelect.value = 'all';
-                        if (prioritySelect) prioritySelect.value = 'all';
-
-                        // 메모 렌더링
-                        return renderMemos().then(() => {
-                            // 해당 메모로 스크롤 - 자동 포커스
-                            const memoElement = document.querySelector(`.memo-item[data-id="${memoToUpdate.id}"]`);
-                            if (memoElement) {
-                                memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                                // 시각적 하이라이트 강화
-                                memoElement.classList.add('highlight-memo');
-                                memoElement.style.border = '2px solid #4a90e2';
-                                memoElement.style.boxShadow = '0 0 15px rgba(74, 144, 226, 0.5)';
-
-                                setTimeout(() => {
-                                    memoElement.classList.remove('highlight-memo');
-                                    memoElement.style.border = '';
-                                    memoElement.style.boxShadow = '';
-                                }, 3000);
-                            }
-
-                            // 성공 메시지 표시
-                            showToast('메모가 패널에 복원되었습니다.');
-                        });
-                    })
-                    .catch(error => {
-                        console.error('위젯에서 패널로 되돌릴 때 메모 저장/렌더링 오류:', error);
-                        showErrorNotification('메모 상태 저장 중 오류가 발생했습니다.');
-                    });
+            // 토글 후 강제로 표시 설정
+            if (viewSettingsDropdown.classList.contains('show')) {
+                viewSettingsDropdown.style.display = 'block';
             } else {
-                console.error('위젯에서 패널로 되돌릴 메모를 찾을 수 없음:', memoId);
-                // 모든 메모 출력해서 디버깅
-                console.log('현재 메모 목록:', memos.map(m => ({id: m.id, type: typeof m.id})));
-                showErrorNotification('메모를 찾을 수 없습니다.');
+                viewSettingsDropdown.style.display = 'none';
             }
         });
 
-        // 메모 강제 표시 이벤트 - 위젯에서 패널로 되돌리기 시 호출됨
-        window.electronAPI.onForceShowMemo((memoId) => {
-            console.log(`메모 강제 표시 요청 수신: memoId=${memoId}`);
-
-            // memoId가 문자열인 경우만 파싱, 아니면 그대로 사용
-            const id = typeof memoId === 'string' ? Number.parseInt(memoId, 10) : memoId;
-
-            // 해당 메모 찾기
-            const memoToShow = memos.find(memo => memo.id === id || memo.id === memoId);
-
-            if (memoToShow) {
-                console.log(`메모 ID ${memoToShow.id} 강제 표시를 위한 플래그 설정`);
-
-                // 강제 표시 플래그 설정
-                memoToShow.isWidget = false;
-                memoToShow.recentlyRestored = true;
-                memoToShow.forceVisible = true;
-
-                // 모든 필터 초기화
-                activeFilters.category = 'all';
-                activeFilters.priority = 'all';
-                activeFilters.searchTerm = '';
-
-                // UI 업데이트
-                if (searchInput) searchInput.value = '';
-                if (categorySelect) categorySelect.value = 'all';
-                if (prioritySelect) prioritySelect.value = 'all';
-
-                // 데이터 저장 및 UI 업데이트
-                saveMemosToStorage()
-                    .then(() => renderMemos())
-                    .then(() => {
-                        // 해당 메모 요소 찾기
-                        const memoElement = document.querySelector(`.memo-item[data-id="${memoToShow.id}"]`);
-                        if (memoElement) {
-                            console.log(`메모 ID ${memoToShow.id} 요소를 찾음, 스크롤 실행`);
-
-                            // 중앙으로 스크롤
-                            memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                            // 시각적 하이라이트 강화
-                            memoElement.classList.add('highlight-memo');
-                            memoElement.style.border = '2px solid #4a90e2';
-                            memoElement.style.boxShadow = '0 0 15px rgba(74, 144, 226, 0.5)';
-
-                            setTimeout(() => {
-                                memoElement.classList.remove('highlight-memo');
-                                memoElement.style.border = '';
-                                memoElement.style.boxShadow = '';
-                            }, 3000);
-
-                            // 토스트 메시지
-                            showToast('메모가 패널에 복원되었습니다.');
-                        } else {
-                            console.error(`메모 ID ${memoToShow.id}에 해당하는 DOM 요소를 찾을 수 없음`);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('메모 강제 표시 중 오류:', error);
-                    });
-            } else {
-                console.error(`강제 표시할 메모를 찾을 수 없음: ${memoId}`);
-            }
-        });
-
-        // 모든 필터 초기화 이벤트
-        window.electronAPI.onResetAllFilters(() => {
-            console.log('모든 필터 초기화 요청 수신');
-
-            // 모든 필터 초기화
-            activeFilters.category = 'all';
-            activeFilters.priority = 'all';
-            activeFilters.searchTerm = '';
-
-            // UI 업데이트
-            if (searchInput) searchInput.value = '';
-            if (categorySelect) categorySelect.value = 'all';
-            if (prioritySelect) prioritySelect.value = 'all';
-
-            // 메모 목록 다시 렌더링
-            renderMemos()
-                .then(() => {
-                    console.log('필터 초기화 및 메모 렌더링 완료');
-                })
-                .catch(error => {
-                    console.error('필터 초기화 후 렌더링 중 오류:', error);
-                });
-        });
-
-        // 위젯의 상태 업데이트 이벤트
-        window.electronAPI.onUpdateMemoWidgetState((data) => {
-            const { id, position, size } = data;
-            const memoToUpdate = memos.find(memo => memo.id === id);
-            if (memoToUpdate) {
-                memoToUpdate.widgetPosition = position;
-                memoToUpdate.widgetSize = size;
-                saveMemosToStorage();
-            }
-        });
-
-        // 메모 포커스 요청 이벤트
-        window.electronAPI.onShowPanelAndFocusMemo((memoId) => {
-            const memoElement = document.querySelector(`.memo-item[data-id="${memoId}"]`);
-            if (memoElement) {
-                memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                memoElement.classList.add('highlight-memo');
-                setTimeout(() => {
-                    memoElement.classList.remove('highlight-memo');
-                }, 2000);
-            }
-        });
-
-        // 앱 버전 표시
-        window.electronAPI.getAppVersion().then(version => {
-            const versionElement = document.getElementById('app-version');
-            if (versionElement) {
-                versionElement.textContent = `MemoWave v${version}`;
-            }
-        }).catch(error => console.error('앱 버전 가져오기 오류:', error));
-
-        // 앱 업데이트 관련 이벤트
-        window.electronAPI.onUpdateAvailable((info) => {
-            showUpdateNotification(`새 버전 ${info.version}이 사용 가능합니다. 다운로드 중..`);
-        });
-
-        window.electronAPI.onUpdateDownloaded((info) => {
-            showUpdateNotification(`새 버전 ${info.version}이 설치 준비되었습니다. 앱을 재시작하면 업데이트가 적용됩니다.`);
-        });
-
-        // 위젯 상태 업데이트 이벤트 - 패널에서 위젯의 isWidget 속성이 변경되었을 때
-        window.electronAPI.onUpdateWidgetStatus(({ memoId, isWidget }) => {
-            console.log(`위젯 상태 업데이트 이벤트 수신: 메모 ID ${memoId}, 위젯 상태 ${isWidget}`);
-
-            // 해당 메모 찾기
-            const memoToUpdate = memos.find(memo => memo.id === memoId);
-            if (memoToUpdate) {
-                console.log(`메모 ID ${memoId}의 위젯 상태를 ${isWidget}로 업데이트`);
-                memoToUpdate.isWidget = isWidget;
-                saveMemosToStorage().then(() => {
-                    // 상태가 변경된 메모 관련 UI 업데이트
-                    renderMemos().then(() => {
-                        // 위젯에서 패널로 돌아온 경우 메모로 스크롤
-                        if (!isWidget) {
-                            const memoElement = document.querySelector(`.memo-item[data-id="${memoId}"]`);
-                            if (memoElement) {
-                                memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                                // 시각적 하이라이트 효과
-                                memoElement.classList.add('highlight-memo');
-                                setTimeout(() => {
-                                    memoElement.classList.remove('highlight-memo');
-                                }, 2000);
-                            }
-                        }
-                    });
-                });
-            }
-        });
-
-        // 패널 메모 목록 새로고침 이벤트
-        window.electronAPI.onRefreshMemos(() => {
-            console.log('메모 목록 새로고침 요청 수신');
-
-            // 메모 목록 다시 로드 후 렌더링
-            loadMemosFromStorage().then(() => {
-                console.log('메모 목록 새로고침 완료');
-            }).catch(error => {
-                console.error('메모 목록 새로고침 중 오류:', error);
+        // 체크박스 변경 이벤트 처리
+        if (toggleToolbarCheckbox) {
+            toggleToolbarCheckbox.addEventListener('change', (e) => {
+                toggleMarkdownToolbar(e.target.checked);
             });
+        }
+
+        if (toggleCompactCheckbox) {
+            toggleCompactCheckbox.addEventListener('change', (e) => {
+                toggleCompactMode(e.target.checked);
+            });
+        }
+
+        if (toggleInputAreaCheckbox) {
+            toggleInputAreaCheckbox.addEventListener('change', (e) => {
+                toggleMemoEditor(e.target.checked);
+            });
+        }
+
+        // 단축키 도움말 버튼
+        if (shortcutHelpBtn) {
+            shortcutHelpBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                viewSettingsDropdown.classList.remove('show');
+                viewSettingsDropdown.style.display = 'none';
+                const shortcutModal = document.getElementById('shortcut-help-modal');
+                if (shortcutModal) shortcutModal.classList.add('show');
+            });
+        }
+
+        // 드롭다운 외부 클릭시 닫기
+        document.addEventListener('click', (e) => {
+            if (!viewSettingsBtn.contains(e.target) && !viewSettingsDropdown.contains(e.target)) {
+                viewSettingsDropdown.classList.remove('show');
+                viewSettingsDropdown.style.display = 'none';
+            }
+        });
+    }
+
+    // 툴바 토글 함수
+    function toggleMarkdownToolbar(show) {
+        if (show === undefined) {
+            toolbar.classList.toggle('hidden');
+        } else if (show) {
+            toolbar.classList.remove('hidden');
+        } else {
+            toolbar.classList.add('hidden');
+        }
+
+        // 설정 저장
+        saveSettings({ toolbarVisible: !toolbar.classList.contains('hidden') });
+    }
+
+    // 컴팩트 모드 토글 함수
+    function toggleCompactMode(enable) {
+        if (enable === undefined) {
+            memosContainer.classList.toggle('compact-mode');
+        } else if (enable) {
+            memosContainer.classList.add('compact-mode');
+        } else {
+            memosContainer.classList.remove('compact-mode');
+        }
+
+        // 설정 저장
+        saveSettings({ compactMode: memosContainer.classList.contains('compact-mode') });
+    }
+
+    // 메모 에디터 토글 함수
+    function toggleMemoEditor(collapse) {
+        if (collapse === undefined) {
+            memoEditorContainer.classList.toggle('collapsed');
+        } else if (collapse) {
+            memoEditorContainer.classList.add('collapsed');
+        } else {
+            memoEditorContainer.classList.remove('collapsed');
+            // 펼쳤을 때 입력 필드에 자동 포커스
+            setTimeout(() => {
+                memoInput.focus();
+            }, 300);
+        }
+
+        // 설정 저장
+        saveSettings({ editorCollapsed: memoEditorContainer.classList.contains('collapsed') });
+    }
+
+    // 위젯 모드 설명 모달 설정
+    function setupWidgetModeHelp() {
+        if (!widgetModeHelpBtn) return;
+
+        widgetModeHelpBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const widgetModal = document.getElementById('widget-mode-modal');
+            if (widgetModal) widgetModal.classList.add('show');
         });
 
-        // 저장된 메모로 즉시 포커스 요청
-        window.electronAPI.onShowPanelAndFocusMemo((memoId) => {
-            console.log(`메모 ID ${memoId}로 포커스 요청 수신`);
+        // 위젯 모드 모달 닫기 버튼
+        const closeWidgetModalBtn = document.getElementById('close-widget-modal');
+        if (closeWidgetModalBtn) {
+            closeWidgetModalBtn.addEventListener('click', () => {
+                const widgetModal = document.getElementById('widget-mode-modal');
+                if (widgetModal) widgetModal.classList.remove('show');
+            });
+        }
+    }
 
-            // 먼저 메모 렌더링 확인
-            renderMemos().then(() => {
-                // 해당 메모 요소 찾기
-                const memoElement = document.querySelector(`.memo-item[data-id="${memoId}"]`);
-                if (memoElement) {
-                    console.log(`메모 ID ${memoId} 요소 찾음, 스크롤 및 강조 표시`);
+    // 단축키 도움말 모달 설정
+    function setupShortcutHelpModal() {
+        const shortcutModal = document.getElementById('shortcut-help-modal');
+        if (!shortcutModal) return;
 
-                    // 스크롤 및 강조 효과
-                    memoElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    memoElement.classList.add('highlight-memo');
-                    memoElement.style.border = '2px solid #4a90e2';
-                    memoElement.style.boxShadow = '0 0 15px rgba(74, 144, 226, 0.5)';
+        const closeShortcutModalBtn = document.getElementById('close-shortcut-modal');
+        if (closeShortcutModalBtn) {
+            closeShortcutModalBtn.addEventListener('click', () => {
+                shortcutModal.classList.remove('show');
+            });
+        }
+    }
 
-                    // 3초 후 강조 효과 제거
-                    setTimeout(() => {
-                        memoElement.classList.remove('highlight-memo');
-                        memoElement.style.border = '';
-                        memoElement.style.boxShadow = '';
-                    }, 3000);
-                } else {
-                    console.error(`메모 ID ${memoId}에 대한 요소를 찾을 수 없음`);
+    // 키보드 단축키 설정
+    function setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            // 포커스가 입력 필드에 있는지 확인
+            const isInputFocused = document.activeElement.tagName === 'INPUT' ||
+                                  document.activeElement.tagName === 'TEXTAREA';
+
+            // 메모 편집 중인지 확인
+            const isEditingMemo = document.querySelector('.memo-content.edit-mode') !== null;
+
+            // Ctrl+F: 필터 토글
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                toggleFilter();
+                // 필터가 보이는 상태라면 검색 필드에 포커스
+                if (filterContainer.style.display !== 'none') {
+                    searchInput.focus();
                 }
-            });
+            }
+
+            // Ctrl+Shift+V: 보기 설정 토글
+            if (e.ctrlKey && e.shiftKey && e.key === 'V') {
+                e.preventDefault();
+                viewSettingsDropdown.classList.toggle('show');
+            }
+
+            // Ctrl+H: 마크다운 도움말
+            if (e.ctrlKey && e.key === 'h') {
+                e.preventDefault();
+                const markdownModal = document.getElementById('markdown-modal');
+                if (markdownModal) markdownModal.classList.toggle('show');
+            }
+
+            // Ctrl+,: 앱 설정
+            if (e.ctrlKey && e.key === ',') {
+                e.preventDefault();
+                window.electronAPI?.openSettings?.();
+            }
+
+            // Ctrl+E: 데이터 내보내기
+            if (e.ctrlKey && e.key === 'e') {
+                e.preventDefault();
+                exportData();
+            }
+
+            // Ctrl+I: 데이터 가져오기
+            if (e.ctrlKey && e.key === 'i') {
+                e.preventDefault();
+                importData();
+            }
+
+            // Ctrl+T: 테마 토글
+            if (e.ctrlKey && e.key === 't') {
+                e.preventDefault();
+                toggleTheme();
+            }
+
+            // Ctrl+K: 단축키 도움말
+            if (e.ctrlKey && e.key === 'k') {
+                e.preventDefault();
+                const shortcutModal = document.getElementById('shortcut-help-modal');
+                if (shortcutModal) shortcutModal.classList.toggle('show');
+            }
+
+            // Alt+N: 새 메모 입력 영역으로 포커스 이동
+            if (e.altKey && e.key === 'n' && !isEditingMemo) {
+                e.preventDefault();
+                memoInput.focus();
+            }
+
+            // Alt+F: 검색창으로 포커스 이동
+            if (e.altKey && e.key === 'f' && !isEditingMemo) {
+                e.preventDefault();
+                searchInput.focus();
+            }
+
+            // Esc: 현재 작업 취소 (모달 닫기, 편집 취소 등)
+            if (e.key === 'Escape') {
+                // 열려있는 모든 모달 닫기
+                const modals = document.querySelectorAll('.markdown-modal.show');
+                for (const modal of modals) {
+                    modal.classList.remove('show');
+                }
+
+                // 보기 설정 드롭다운 닫기
+                if (viewSettingsDropdown.classList.contains('show')) {
+                    viewSettingsDropdown.classList.remove('show');
+                }
+
+                // 필터 닫기
+                if (filterContainer.style.display === 'block') {
+                    filterContainer.style.display = 'none';
+                }
+
+                // 메모 편집 취소
+                if (isEditingMemo && !isInputFocused) {
+                    const editMode = document.querySelector('.memo-content.edit-mode');
+                    const memoId = editMode.closest('.memo-item').dataset.id;
+                    const memoDiv = document.querySelector(`.memo-item[data-id="${memoId}"]`);
+                    toggleEditMode(false, memoDiv);
+                }
+            }
         });
+    }
+
+    // 메모 생성 시 위젯 모드 설정
+    function createMemoContent(memo) {
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'memo-content view-mode';
+
+        // 메모 내용 HTML 변환
+        const htmlContent = convertMarkdownToHTML(memo.content);
+
+        // 내용 길이 확인 (대략적인 줄 수 계산)
+        const lines = memo.content.split('\n');
+        const isLongContent = lines.length > 3 || memo.content.length > 300;
+
+        if (isLongContent) {
+            // 제한된 내용만 표시
+            const shortContent = lines.slice(0, 3).join('\n');
+            const shortHtml = convertMarkdownToHTML(`${shortContent}...`);
+            contentDiv.innerHTML = shortHtml;
+
+            // 더보기 링크 추가
+            const readMoreLink = document.createElement('a');
+            readMoreLink.className = 'read-more-link';
+            readMoreLink.textContent = '더보기';
+            readMoreLink.href = '#';
+            readMoreLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                // 전체 내용으로 교체
+                contentDiv.innerHTML = htmlContent;
+                readMoreLink.style.display = 'none';
+
+                // 접기 링크 추가
+                const collapseLink = document.createElement('a');
+                collapseLink.className = 'read-more-link';
+                collapseLink.textContent = '접기';
+                collapseLink.href = '#';
+                collapseLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // 짧은 내용으로 교체
+                    contentDiv.innerHTML = shortHtml;
+                    collapseLink.remove();
+                    readMoreLink.style.display = 'block';
+                    contentDiv.appendChild(readMoreLink);
+                });
+
+                contentDiv.appendChild(collapseLink);
+            });
+
+            contentDiv.appendChild(readMoreLink);
+        } else {
+            contentDiv.innerHTML = htmlContent;
+        }
+
+        return contentDiv;
     }
 
     // 설정 로드
@@ -671,20 +726,48 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 설정 적용
     function applySettings() {
-        // 글꼴 크기 적용
-        document.documentElement.style.setProperty('--memo-font-size', `${settings.fontSize}px`);
+        if (!settings) return;
 
-        // 다크/라이트 모드 적용
-        if (settings.theme === 'dark') {
+        // 다크 모드 적용
+        if (settings.darkMode) {
             document.documentElement.setAttribute('data-theme', 'dark');
-        } else if (settings.theme === 'light') {
-            document.documentElement.setAttribute('data-theme', 'light');
         } else {
             document.documentElement.removeAttribute('data-theme');
         }
 
-        // 마크다운 툴바 표시 여부
-        toolbar.style.display = settings.markdownToolbar ? 'flex' : 'none';
+        // 컴팩트 모드 적용
+        if (settings.compactMode) {
+            memosContainer.classList.add('compact-mode');
+        } else {
+            memosContainer.classList.remove('compact-mode');
+        }
+
+        // 툴바 표시 설정
+        if (settings.toolbarVisible === false) {
+            toolbar.classList.add('hidden');
+        } else {
+            toolbar.classList.remove('hidden');
+        }
+
+        // 메모 에디터 접기 설정
+        if (settings.editorCollapsed) {
+            memoEditorContainer.classList.add('collapsed');
+        } else {
+            memoEditorContainer.classList.remove('collapsed');
+        }
+
+        console.log('설정 적용 완료:', settings);
+    }
+
+    // 설정 저장 함수
+    async function saveSettings(newSettings) {
+        settings = { ...settings, ...newSettings };
+        try {
+            await window.electronAPI.saveSettings(settings);
+            console.log('설정 저장 완료:', settings);
+        } catch (error) {
+            console.error('설정 저장 오류:', error);
+        }
     }
 
     // 마크다운을 HTML로 변환하는 함수
@@ -1601,8 +1684,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 메모 입력 영역 표시/숨김 토글 함수 추가
-    function toggleMemoEditor() {
+    // 메모 입력 영역 토글 버튼 설정
+    function setupMemoEditorToggle() {
+        console.log('메모 입력 영역 토글 버튼 설정');
+        const toggleBtn = document.getElementById('toggle-editor-btn');
+
+        if (toggleBtn) {
+            // 기존 이벤트 리스너 제거 (이중 바인딩 방지)
+            toggleBtn.removeEventListener('click', handleMemoEditorToggle);
+
+            // 새 이벤트 리스너 추가
+            toggleBtn.addEventListener('click', handleMemoEditorToggle);
+            console.log('메모 에디터 토글 버튼에 이벤트 리스너 추가 완료');
+        } else {
+            console.warn('메모 에디터 토글 버튼을 찾을 수 없습니다.');
+        }
+    }
+
+    // 메모 입력 영역 표시/숨김 토글 함수
+    function handleMemoEditorToggle() {
         const editorContainer = document.getElementById('memo-editor-container');
         const toggleBtn = document.getElementById('toggle-editor-btn');
 
@@ -1632,7 +1732,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // 마크다운 툴바 토글 함수
-    function toggleMarkdownToolbar() {
+    function handleMarkdownToolbarToggle() {
         const toolbar = document.getElementById('markdown-toolbar');
         const toolbarToggleBtn = document.getElementById('toggle-toolbar-btn');
 
@@ -1645,187 +1745,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 초기화 직접 호출
-    console.log('initialize 함수 호출 전');
-    initialize().then(() => {
-        console.log('초기화 완료');
-
-        // 푸터 관련 기능 설정
-        setupMarkdownModal();
-        setupThemeToggle();
-
-        // 초기화 후 버튼 다시 확인
-        setTimeout(() => {
-            console.log('초기화 완료 후 로그인 버튼 재설정');
-            setupAuthButton();
-
-            // 디버깅을 위해 창에 전역 변수로 노출
-            window.debugAuth = {
-                openLoginWindow: () => {
-                    console.log('디버그 메서드로 로그인 창 열기 시도');
-                    window.electronAPI.openLoginWindow();
-                },
-                checkButton: () => {
-                    const btn = document.getElementById('auth-button');
-                    console.log('현재 auth-button 상태:', btn ? '존재' : '없음');
-                    return btn;
-                }
-            };
-            console.log('디버그 도구 설정 완료: window.debugAuth 사용 가능');
-        }, 1000);
-    }).catch(err => {
-        console.error('초기화 오류:', err);
-    });
-
-    // 메모 에디터 토글 설정
-    function setupMemoEditorToggle() {
-        const memoEditorContainer = document.getElementById('memo-editor-container');
-        const searchAndFilter = document.querySelector('.search-and-filter');
-
-        // 토글 버튼 컨테이너 추가
-        const toggleContainer = document.createElement('div');
-        toggleContainer.classList.add('toggle-container');
-
-        // 에디터 토글 버튼
-        const toggleEditorBtn = document.createElement('button');
-        toggleEditorBtn.id = 'toggle-editor-btn';
-        toggleEditorBtn.classList.add('toggle-btn');
-        toggleEditorBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" width="16" height="16">
-                <path fill="currentColor" d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14l-6-6z"></path>
-            </svg>
-            <span>입력 영역 접기</span>
-        `;
-        toggleEditorBtn.title = "입력 영역 접기";
-        toggleEditorBtn.addEventListener('click', toggleMemoEditor);
-
-        // 툴바 토글 버튼
-        const toggleToolbarBtn = document.createElement('button');
-        toggleToolbarBtn.id = 'toggle-toolbar-btn';
-        toggleToolbarBtn.classList.add('toggle-btn');
-        toggleToolbarBtn.textContent = '툴바 숨기기';
-        toggleToolbarBtn.addEventListener('click', toggleMarkdownToolbar);
-
-        // 컴팩트 모드 토글 버튼
-        const compactModeBtn = document.createElement('button');
-        compactModeBtn.id = 'compact-mode-btn';
-        compactModeBtn.classList.add('toggle-btn');
-
-        // 이전 상태 확인해서 버튼 텍스트 설정
-        const isCompact = localStorage.getItem('memo-compact-mode') === 'true';
-        if (isCompact) {
-            compactModeBtn.textContent = '확장 모드';
-            compactModeBtn.title = '메모를 더 크게 표시';
-            // 컴팩트 모드 클래스 적용
-            const memosContainer = document.getElementById('memos-container');
-            if (memosContainer) {
-                memosContainer.classList.add('compact-mode');
-            }
-        } else {
-            compactModeBtn.textContent = '컴팩트 모드';
-            compactModeBtn.title = '메모를 더 작게 표시';
-        }
-
-        compactModeBtn.addEventListener('click', toggleCompactMode);
-
-        // 버튼들을 컨테이너에 추가
-        toggleContainer.appendChild(toggleToolbarBtn);
-        toggleContainer.appendChild(compactModeBtn);
-        toggleContainer.appendChild(toggleEditorBtn);
-
-        // 컨테이너를 필터 영역 다음에 삽입
-        if (searchAndFilter && !document.querySelector('.toggle-container')) {
-            searchAndFilter.after(toggleContainer);
+    // 설정 저장 함수
+    async function updateSettings(newSettings) {
+        settings = { ...settings, ...newSettings };
+        try {
+            await window.electronAPI.saveSettings(settings);
+            console.log('설정 저장 완료:', settings);
+        } catch (error) {
+            console.error('설정 저장 오류:', error);
         }
     }
 
-    // 드래그 앤 드롭 설정
-    function setupDragAndDrop() {
-        // 메모 컨테이너에 dragover 이벤트 추가
-        memosContainer.addEventListener('dragover', (event) => {
-            event.preventDefault();
-            event.dataTransfer.dropEffect = 'move';
-
-            const draggingElement = document.querySelector('.dragging');
-            if (!draggingElement) return;
-
-            // 현재 마우스 위치에서 가장 가까운 메모 요소 찾기
-            const afterElement = getDragAfterElement(memosContainer, event.clientY);
-
-            // 드롭 타겟 표시 초기화 - forEach 대신 for...of 사용
-            for (const el of document.querySelectorAll('.drop-target-above, .drop-target-below')) {
-                el.classList.remove('drop-target-above', 'drop-target-below');
-            }
-
-            // 드롭 위치 시각적 표시
-            if (afterElement) {
-                afterElement.classList.add('drop-target-above');
-                memosContainer.insertBefore(draggingElement, afterElement);
-            } else {
-                const lastElement = memosContainer.querySelector('.memo-item:last-child:not(.dragging)');
-                if (lastElement) {
-                    lastElement.classList.add('drop-target-below');
-                }
-                memosContainer.appendChild(draggingElement);
-            }
-        });
-
-        // 메모 컨테이너에 drop 이벤트 추가
-        memosContainer.addEventListener('drop', (event) => {
-            event.preventDefault();
-            const memoId = event.dataTransfer.getData('text/plain');
-            const draggedElement = document.querySelector(`.memo-item[data-id="${memoId}"]`);
-
-            if (draggedElement) {
-                draggedElement.classList.remove('dragging');
-
-                // 드롭 타겟 표시 제거 - forEach 대신 for...of 사용
-                for (const el of document.querySelectorAll('.drop-target-above, .drop-target-below')) {
-                    el.classList.remove('drop-target-above', 'drop-target-below');
-                }
-
-                // 메모 순서 변경 - 배열 재정렬
-                const newMemoOrder = Array.from(memosContainer.querySelectorAll('.memo-item'))
-                    .map(item => Number.parseInt(item.dataset.id, 10));
-
-                // memos 배열 재정렬
-                memos = newMemoOrder.map(id => memos.find(memo => memo.id === id))
-                    .filter(memo => memo !== undefined);
-
-                // 새 순서 저장
-                saveMemosToStorage();
-
-                // 성공 메시지 표시
-                showToast('메모 순서가 변경되었습니다.');
-            }
-        });
-
-        // 메모 컨테이너에 dragleave 이벤트 추가
-        memosContainer.addEventListener('dragleave', (event) => {
-            if (event.target === memosContainer) {
-                for (const el of document.querySelectorAll('.drop-target-above, .drop-target-below')) {
-                    el.classList.remove('drop-target-above', 'drop-target-below');
-                }
-            }
-        });
-    }
-
-    // 드래그 중인 요소를 놓을 위치 결정 (가장 가까운 요소 찾기)
-    function getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('.memo-item:not(.dragging)')];
-
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-
-            // offset이 음수인데 가장 작은(0에 가까운) 경우가 드롭할 곳
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            }
-            // 불필요한 else 제거
-            return closest;
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
+    // 초기화 함수 호출
+    initialize();
 });
 
 // 메모 추가 버튼 이벤트 연결
@@ -2171,7 +2103,16 @@ function hideAuthDropdown() {
 // 로그인 버튼을 위한 이벤트 추가
 function setupAuthButton() {
     const authButton = document.getElementById('auth-button');
+    console.log('setupAuthButton 함수 실행, 버튼 요소:', authButton ? '있음' : '없음');
+
     if (authButton) {
+        // 기존 이벤트 리스너 제거 (이중 바인딩 방지)
+        authButton.removeEventListener('click', handleLoginClick);
+
+        // 새 이벤트 리스너 추가
+        authButton.addEventListener('click', handleLoginClick);
+        console.log('로그인 버튼에 이벤트 리스너 추가 완료');
+
         // 마우스가 로그인 버튼을 떠날 때 이벤트 처리
         authButton.addEventListener('mouseleave', () => {
             window.dropdownTimeout = setTimeout(() => {
@@ -2182,13 +2123,23 @@ function setupAuthButton() {
             }, 300); // 300ms 지연
         });
 
-        // 로그인 상태 확인 후 클릭 이벤트 다시 설정
-        window.electronAPI.getAuthStatus().then(auth => {
-            const isLoggedIn = auth?.isLoggedIn;
-            if (!isLoggedIn) {
-                authButton.addEventListener('click', handleLoginClick);
+        // 마우스 오버 시 로그인 상태에 따라 동작 변경
+        authButton.addEventListener('mouseenter', async () => {
+            // 로그인 상태 확인
+            try {
+                const auth = await window.electronAPI.getAuthStatus();
+                const isLoggedIn = auth?.isLoggedIn;
+
+                // 로그인된 상태에서만 드롭다운 메뉴 표시
+                if (isLoggedIn) {
+                    showAuthDropdown();
+                }
+            } catch (error) {
+                console.error('로그인 상태 확인 오류:', error);
             }
         });
+    } else {
+        console.error('로그인 버튼 요소를 찾을 수 없습니다.');
     }
 }
 
@@ -2251,12 +2202,11 @@ async function handleLogout() {
 
 // 로그인 버튼 클릭 처리
 function handleLoginClick(e) {
+    console.log('handleLoginClick 함수 실행');
     if (e) {
         e.preventDefault();
         e.stopPropagation();
     }
-
-    console.log('로그인 버튼 클릭');
 
     // 기존 에러 알림 제거
     const existingErrors = document.querySelectorAll('.error-notification');
@@ -2266,16 +2216,28 @@ function handleLoginClick(e) {
         }
     }
 
-    // 로그인 창 열기
-    window.electronAPI.openLoginWindow();
-}
+    // 현재 로그인 상태 확인
+    window.electronAPI.getAuthStatus().then(auth => {
+        const isLoggedIn = auth?.isLoggedIn;
+        console.log('현재 로그인 상태:', isLoggedIn ? '로그인됨' : '로그아웃됨');
 
-// 로그인 오류 이벤트 리스너 설정 (초기화 시 호출)
-function setupLoginErrorHandler() {
-    // 로그인 오류 이벤트 리스너 추가
-    window.electronAPI.onLoginError((error) => {
-        console.error('로그인 오류 발생:', error);
-        showErrorNotification(`로그인 오류: ${error}`);
+        if (isLoggedIn) {
+            // 로그인된 상태면 드롭다운 표시 (로그아웃 옵션 포함)
+            showAuthDropdown();
+        } else {
+            // 로그인 창 열기
+            console.log('로그인 창 열기 시도');
+            try {
+                window.electronAPI.openLoginWindow();
+                console.log('로그인 창 요청 완료');
+            } catch (error) {
+                console.error('로그인 창 열기 오류:', error);
+                showErrorNotification('로그인 창을 열 수 없습니다. 개발자 도구를 확인하세요.');
+            }
+        }
+    }).catch(error => {
+        console.error('로그인 상태 확인 오류:', error);
+        showErrorNotification(`로그인 상태를 확인할 수 없습니다: ${error.message}`);
     });
 }
 
@@ -2297,4 +2259,136 @@ function toggleCompactMode() {
         compactBtn.title = '메모를 더 작게 표시';
         localStorage.setItem('memo-compact-mode', 'false');
     }
+}
+
+// 드래그 앤 드롭을 위한 메모 컨테이너 설정
+function setupDragAndDrop(containerElement) {
+    console.log('드래그 앤 드롭 설정');
+
+    if (!containerElement) {
+        console.error('메모 컨테이너를 찾을 수 없습니다.');
+        return;
+    }
+
+    // 메모 컨테이너에 드롭 영역 이벤트 추가
+    containerElement.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const draggedItem = document.querySelector('.dragging');
+        if (draggedItem) {
+            // 드래그 중인 아이템이 있을 때만 처리
+            e.dataTransfer.dropEffect = 'move';
+
+            // 드롭 위치 하이라이트 효과
+            const afterElement = getDragAfterElement(containerElement, e.clientY);
+            if (afterElement == null) {
+                containerElement.appendChild(draggedItem);
+            } else {
+                containerElement.insertBefore(draggedItem, afterElement);
+            }
+        }
+    });
+
+    // 드롭 이벤트 처리
+    containerElement.addEventListener('drop', (e) => {
+        e.preventDefault();
+
+        // 드래그 클래스 제거
+        const draggedItem = document.querySelector('.dragging');
+        if (draggedItem) {
+            draggedItem.classList.remove('dragging');
+
+            // 메모 순서 저장
+            saveMemoOrder();
+        }
+
+        // 드롭 타겟 스타일 제거
+        const potentialDropTargets = document.querySelectorAll('.potential-drop-target');
+        for (const item of potentialDropTargets) {
+            item.classList.remove('potential-drop-target');
+        }
+    });
+
+    console.log('드래그 앤 드롭 설정 완료');
+}
+
+// 드래그 위치 계산 헬퍼 함수
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.memo-item:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        }
+        return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// 메모 순서 저장
+function saveMemoOrder() {
+    // 현재 DOM에 표시된 순서대로 메모 ID 수집
+    const memoIds = [...document.querySelectorAll('.memo-item')].map(item =>
+        Number.parseInt(item.dataset.id, 10)
+    );
+
+    // 목록 재정렬
+    if (memoIds.length > 0) {
+        // 새 배열에 재정렬된 메모 추가
+        const newOrder = [];
+        for (const id of memoIds) {
+            const memo = memos.find(m => m.id === id);
+            if (memo) {
+                newOrder.push(memo);
+            }
+        }
+
+        // 기존 배열 업데이트
+        if (newOrder.length === memos.length) {
+            memos = newOrder;
+            saveMemosToStorage();
+            console.log('메모 순서 저장 완료');
+        } else {
+            console.warn('메모 순서 저장 실패: 길이 불일치',
+                {새순서길이: newOrder.length, 원래길이: memos.length});
+        }
+    }
+}
+
+// 로그인 오류 핸들러 설정
+function setupLoginErrorHandler(loadMemosFunc, updateFilterUIFunc) {
+    console.log('로그인 오류 핸들러 설정');
+
+    if (!loadMemosFunc || !updateFilterUIFunc) {
+        console.error('로그인 핸들러에 필요한 함수가 제공되지 않았습니다.');
+        return;
+    }
+
+    // 로그인 이벤트 리스너 추가
+    window.electronAPI.onLoginSuccess((event, user) => {
+        console.log('로그인 성공 이벤트 수신:', user);
+        updateAuthButtonState(true, user);
+
+        // 데이터 로드
+        loadMemosFunc();
+        updateFilterUIFunc();
+
+        // 로그인 프롬프트 제거
+        const loginPrompt = document.querySelector('.login-prompt');
+        if (loginPrompt) {
+            loginPrompt.remove();
+        }
+
+        // 성공 메시지 표시
+        showToast('로그인 되었습니다. 환영합니다!');
+    });
+
+    window.electronAPI.onLoginError((event, error) => {
+        console.error('로그인 오류 이벤트 수신:', error);
+        updateAuthButtonState(false, null);
+        showErrorNotification(`로그인 실패: ${error?.message || '알 수 없는 오류'}`);
+    });
+
+    console.log('로그인 오류 핸들러 설정 완료');
 }
